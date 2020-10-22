@@ -1,6 +1,9 @@
 package main
 
 import (
+	"flag"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -9,15 +12,43 @@ func main() {
 }
 
 //StartGin is
-func StartGin()*gin.Engine{
+func StartGin() *gin.Engine {
 	r := gin.Default()
+
+	// TODO : Look Before Production (Security)
+	config := cors.DefaultConfig()
+	config.AllowHeaders = append(config.AllowHeaders, "userid")
+	config.AllowOrigins = []string{"http://localhost:3000"}
+	r.Use(cors.New(config))
+
 	r.GET("/ping", func(c *gin.Context) {
 		c.String(200, "Hello :)")
 	})
 	user := r.Group("/user")
 	{
-		user.POST("/login/:name", loginRoute)
+		user.POST("/login", loginRoute)
+		user.POST("/register", registerRoute)
 	}
-	go r.Run()
+
+	room := r.Group("/room")
+	{
+		room.POST("/get/:roomid", getRoomRoute)
+		room.POST("/create", createRoomRoute)
+		room.POST("/join/:roomid", joinRoomRoute)
+		room.POST("/listRooms", listRoomsRoute)
+	}
+
+	stream := r.Group("/stream")
+	{
+		stream.POST("/sdp/:roomid")
+		stream.POST("/publish/:roomid")
+		stream.POST("/join/:roomid")
+	}
+
+	if flag.Lookup("test.v") == nil {
+		r.Run(":8080")
+	} else {
+		go r.Run(":8080")
+	}
 	return r
 }
