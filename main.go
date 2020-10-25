@@ -18,7 +18,8 @@ func StartGin() *gin.Engine {
 	// TODO : Look Before Production (Security)
 	config := cors.DefaultConfig()
 	config.AllowHeaders = append(config.AllowHeaders, "userid")
-	config.AllowOrigins = []string{"http://localhost:3000"}
+	config.AllowAllOrigins = true
+	//config.AllowOrigins = []string{"http://localhost:3000"}
 	r.Use(cors.New(config))
 
 	r.GET("/ping", func(c *gin.Context) {
@@ -40,9 +41,9 @@ func StartGin() *gin.Engine {
 
 	stream := r.Group("/stream")
 	{
-		stream.POST("/sdp/:roomid")
-		stream.POST("/publish/:roomid")
-		stream.POST("/join/:roomid")
+		stream.POST("/sdp/:roomid", sdpRoute)
+		//stream.POST("/publish/:roomid")
+		//stream.POST("/join/:roomid")
 	}
 
 	if flag.Lookup("test.v") == nil {
