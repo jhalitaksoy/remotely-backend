@@ -42,6 +42,7 @@ func (repo *UserRepositoryMock) LoginUser(user *User) bool {
 	for _, eachUser := range repo.users {
 		if eachUser.Name == user.Name {
 			if eachUser.Password == user.Password {
+				user.ID = eachUser.ID
 				return true
 			}
 		}
