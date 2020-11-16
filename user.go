@@ -1,6 +1,10 @@
 package main
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/pion/webrtc/v2"
+)
 
 //User is
 type User struct {
@@ -58,4 +62,11 @@ func (repo *UserRepositoryMock) GetUserByID(ID int) *User {
 		}
 	}
 	return nil
+}
+
+//RoomUser is
+type RoomUser struct {
+	User           *User
+	PeerConnection *webrtc.PeerConnection
+	DataChannel    *webrtc.DataChannel
 }

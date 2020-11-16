@@ -37,6 +37,8 @@ func StartGin() *gin.Engine {
 		room.POST("/create", createRoomRoute)
 		room.POST("/join/:roomid", joinRoomRoute)
 		room.POST("/listRooms", listRoomsRoute)
+		//Add Test
+		room.POST("/chat/:roomid", chatRoomRoute)
 	}
 
 	stream := r.Group("/stream")

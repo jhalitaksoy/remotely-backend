@@ -5,6 +5,8 @@ type Room struct {
 	ID    int
 	Name  string
 	Owner *User
+	Users []*RoomUser
+	ChatMessages []*ChatMessage
 }
 
 //RoomRepository is
@@ -13,6 +15,24 @@ type RoomRepository interface {
 	CreateRoom(*User, *Room) bool
 	JoinRoom(*User, *Room) bool
 	ListRooms(*User) []*Room
+}
+
+func (room *Room) addRoomUser(newRoomUser *RoomUser) {
+	for i, eachRoomUser := range room.Users {
+		if eachRoomUser.User.ID == newRoomUser.User.ID {
+			//refactor
+			len := len(room.Users) - 1
+			room.Users[i] = room.Users[len]
+			room.Users[len] = nil
+			room.Users = room.Users[:len]
+			break
+		}
+	}
+	room.Users = append(room.Users, newRoomUser)
+}
+
+func (room *Room) addChatMessage(chatMessage *ChatMessage) {
+	room.ChatMessages = append(room.ChatMessages, chatMessage)
 }
 
 var roomRepository RoomRepository = &RoomRepositoryMock{lastRoomID: -1, userRoomsTable: make(map[*User][]*Room)}

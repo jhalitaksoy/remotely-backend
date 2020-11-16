@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -115,6 +114,25 @@ func listRoomsRoute(c *gin.Context) {
 	c.JSON(http.StatusOK, rooms)
 }
 
+func chatRoomRoute(c *gin.Context) {
+	//Security issue !!!!!!!!!!!!!!
+
+	//userID, err := strconv.Atoi(c.GetHeader("userID"))
+	//if err != nil {
+	//	c.AbortWithStatus(http.StatusBadRequest)
+	//	return
+	//}
+	//user := userRepository.GetUserByID(userID)
+
+	roomIDStr := c.Params.ByName("roomid")
+	roomID, err := strconv.Atoi(roomIDStr)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+	}
+	room := roomRepository.GetRoomByID(roomID)
+	c.JSON(http.StatusOK, room.ChatMessages)
+}
+
 func getRoomRoute(c *gin.Context) {
 	//userID, err := strconv.Atoi(c.GetHeader("userID"))
 	//if err != nil {
@@ -200,14 +218,23 @@ func sdpRoute(c *gin.Context) {
 			return
 		}
 
-		addOnDataChannel(pc)
-
 		log.Println("Client")
 	default:
 		c.AbortWithStatus(http.StatusBadRequest)
 		//handler.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
+
+	roomUser := &RoomUser{
+		User:           user,
+		PeerConnection: pc,
+	}
+
+	room.addRoomUser(roomUser)
+
+	log.Printf("Added RoomUser id : %d. RoomUser Count : %d", userID, len(room.Users))
+
+	DataChannelHandler(pc, room, roomUser)
 
 	// Set the remote SessionDescription
 	err = pc.SetRemoteDescription(offer.SD)
@@ -275,64 +302,4 @@ func addOnTrack(pc *webrtc.PeerConnection, localTrack *webrtc.Track) {
 		}
 	})
 
-}
-
-type msg struct {
-	Text   string `json:"text"`
-	X      int    `json:"x"`
-	Y      int    `json:"y"`
-	Height int    `json:"height"`
-	Width  int    `json:"width"`
-}
-
-func addOnDataChannel(pc *webrtc.PeerConnection) {
-	// Register data channel creation handling
-	pc.OnDataChannel(func(d *webrtc.DataChannel) {
-		log.Printf("New DataChannel %s - %d\n", d.Label(), d.ID())
-
-		// Register channel opening handling
-		d.OnOpen(func() {
-			log.Printf("Open Data channel %s - %d\n", d.Label(), d.ID())
-
-			ticker := time.NewTicker(1 * time.Second)
-			t := []string{"one", "two", "three", "four"}
-			s1 := rand.NewSource(42)
-			r1 := rand.New(s1)
-
-			d.OnClose(func() {
-				log.Printf("Closed Data channel %s - %d.\n", d.Label(), d.ID())
-				ticker.Stop()
-			})
-
-			for range ticker.C {
-				// Send the message as text
-				text := time.Now().Format("2006-01-02 15:04:05") + " - " + t[r1.Intn(4)]
-				x := r1.Intn(200)
-				y := r1.Intn(200)
-				height := 100
-				width := 100
-
-				msgSent := msg{
-					Text:   text,
-					X:      x,
-					Y:      y,
-					Height: height,
-					Width:  width,
-				}
-
-				//Prepare message to be sent
-				msgBytes, err := json.Marshal(msgSent)
-				if err != nil {
-					log.Println("Json marshalling error. Error:", err.Error())
-					continue
-				}
-
-				sendErr := d.Send(msgBytes)
-				if sendErr != nil {
-					log.Println(sendErr)
-					d.Close()
-				}
-			}
-		})
-	})
 }

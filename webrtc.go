@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"log"
 	"math/rand"
 	"time"
 
@@ -86,4 +88,78 @@ func (repo *MediaRoomRepository) GetMediaRoomByRoomID(id int) *MediaRoom {
 		repo.mediaRooms[id] = mediaRoom
 	}
 	return mediaRoom
+}
+
+//MessageType is
+type MessageType string
+
+const (
+	chatControl = "chatControl"
+	chatMessage = "chatMessage"
+)
+
+//ChatMessageData is
+type ChatMessageData struct {
+	UserID   string
+	UserName string
+	Message  string
+}
+
+//DataChannelHandler is
+func DataChannelHandler(pc *webrtc.PeerConnection, room *Room, roomUser *RoomUser) {
+	// Register data channel creation handling
+	pc.OnDataChannel(func(d *webrtc.DataChannel) {
+		roomUser.DataChannel = d
+
+		log.Printf("New DataChannel %s - %d\n", d.Label(), d.ID())
+
+		d.OnOpen(func() {
+			log.Printf("Open Data channel %s - %d\n", d.Label(), d.ID())
+		})
+
+		d.OnClose(func() {
+			log.Printf("Closed Data channel %s - %d.\n", d.Label(), d.ID())
+		})
+
+		d.OnMessage(func(msg webrtc.DataChannelMessage) {
+			var msg1 ChatMessage
+			err := json.Unmarshal(msg.Data, &msg1)
+			if err != nil {
+				log.Fatalf("An error occured when parsing coming message %v", err)
+			}
+			log.Println(msg1)
+
+			SendChatMessage(room, &msg1)
+		})
+	})
+}
+
+//ChatMessage is
+type ChatMessage struct {
+	Text string `json:"text"`
+	User struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"user"`
+}
+
+//SendChatMessage is
+func SendChatMessage(room *Room, chatMessage *ChatMessage) {
+	user := userRepository.GetUserByID(chatMessage.User.ID)
+	if user == nil {
+		log.Fatalf("User not found! id : %d", chatMessage.User.ID)
+		return
+	}
+	chatMessage.User.Name = user.Name
+
+	room.addChatMessage(chatMessage)
+
+	json, err := json.Marshal(chatMessage)
+	if err != nil {
+		log.Fatalf("An error occured at converting ChatMessage to json : %v", err)
+		return
+	}
+	for _, roomUser := range room.Users {
+		roomUser.DataChannel.Send(json)
+	}
 }
