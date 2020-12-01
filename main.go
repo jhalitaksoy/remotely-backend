@@ -31,21 +31,24 @@ func StartGin() *gin.Engine {
 		user.POST("/register", registerRoute)
 	}
 
-	room := r.Group("/room")
+	r.Use(authRequired)
 	{
-		room.POST("/get/:roomid", getRoomRoute)
-		room.POST("/create", createRoomRoute)
-		room.POST("/join/:roomid", joinRoomRoute)
-		room.POST("/listRooms", listRoomsRoute)
-		//Add Test
-		room.POST("/chat/:roomid", chatRoomRoute)
-	}
+		room := r.Group("/room")
+		{
+			room.POST("/get/:roomid", getRoomRoute)
+			room.POST("/create", createRoomRoute)
+			room.POST("/join/:roomid", joinRoomRoute)
+			room.POST("/listRooms", listRoomsRoute)
+			//Add Test
+			room.POST("/chat/:roomid", chatRoomRoute)
+		}
 
-	stream := r.Group("/stream")
-	{
-		stream.POST("/sdp/:roomid", sdpRoute)
-		//stream.POST("/publish/:roomid")
-		//stream.POST("/join/:roomid")
+		stream := r.Group("/stream")
+		{
+			stream.POST("/sdp/:roomid", sdpRoute)
+			//stream.POST("/publish/:roomid")
+			//stream.POST("/join/:roomid")
+		}
 	}
 
 	if flag.Lookup("test.v") == nil {
