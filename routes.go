@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pion/rtcp"
+	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v2"
 	"github.com/pion/webrtc/v2/pkg/media/samplebuilder"
@@ -206,13 +207,23 @@ func sdpRoute(c *gin.Context) {
 			panic(err)
 		}
 
+		if _, err = pc.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
+			panic(err)
+		}
+
 		// Set a handler for when a new remote track starts
 		// Add the incoming track to the list of tracks maintained in the server
-		addOnTrack(pc, mediaRoom.track)
+		addOnTrack(pc, mediaRoom.audioTrack, mediaRoom.videoTrack)
 
 		log.Println("Publisher")
 	case "Client":
-		_, err = pc.AddTrack(mediaRoom.track)
+		_, err = pc.AddTrack(mediaRoom.audioTrack)
+			if err != nil {
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+
+		_, err = pc.AddTrack(mediaRoom.videoTrack)
 		if err != nil {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
@@ -262,7 +273,7 @@ func sdpRoute(c *gin.Context) {
 	//c.JSON(http.StatusOK, rooms)
 }
 
-func addOnTrack(pc *webrtc.PeerConnection, localTrack *webrtc.Track) {
+func addOnTrack(pc *webrtc.PeerConnection, audioTrack, videoTrack *webrtc.Track) {
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
 	pc.OnTrack(func(remoteTrack *webrtc.Track, receiver *webrtc.RTPReceiver) {
@@ -282,8 +293,10 @@ func addOnTrack(pc *webrtc.PeerConnection, localTrack *webrtc.Track) {
 		}()
 
 		log.Println("Track acquired", remoteTrack.Kind(), remoteTrack.Codec())
+			
+		builderVideo := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.VP8Packet{})
+		builderAudio := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.OpusPacket{})
 
-		builder := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.VP8Packet{})
 		for {
 			rtp, err := remoteTrack.ReadRTP()
 			if err != nil {
@@ -293,13 +306,32 @@ func addOnTrack(pc *webrtc.PeerConnection, localTrack *webrtc.Track) {
 				log.Panic(err)
 			}
 
-			builder.Push(rtp)
-			for s := builder.Pop(); s != nil; s = builder.Pop() {
-				if err := localTrack.WriteSample(*s); err != nil && err != io.ErrClosedPipe {
-					log.Panic(err)
+			if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
+				builderAudio.Push(rtp)
+				for s := builderAudio.Pop(); s != nil; s = builderAudio.Pop() {
+					if err := audioTrack.WriteSample(*s); err != nil && err != io.ErrClosedPipe {
+						log.Panic(err)
+					}
+				}
+			} else if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+				builderVideo.Push(rtp)
+				for s := builderVideo.Pop(); s != nil; s = builderVideo.Pop() {
+					if err := videoTrack.WriteSample(*s); err != nil && err != io.ErrClosedPipe {
+						log.Panic(err)
+					}
 				}
 			}
 		}
 	})
+}
 
+func pushVideo(sampleBuilder *samplebuilder.SampleBuilder, localTrack *webrtc.Track, rtpPacket *rtp.Packet) {
+	sampleBuilder.Push(rtpPacket)
+
+	for s := sampleBuilder.Pop(); s != nil; s = sampleBuilder.Pop() {
+		err := localTrack.WriteSample(*s)
+		if err != nil && err != io.ErrClosedPipe {
+			log.Panic(err)
+		}
+	}
 }

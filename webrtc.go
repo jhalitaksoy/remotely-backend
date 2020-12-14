@@ -27,23 +27,37 @@ const (
 type MediaRoom struct {
 	RoomID int
 	api    *webrtc.API
-	track  *webrtc.Track
+	audioTrack  *webrtc.Track
+	videoTrack  *webrtc.Track
 }
 
 //NewMediaRoom is
 func NewMediaRoom(id int) *MediaRoom {
 	m := webrtc.MediaEngine{}
-	codec := webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000)
-	m.RegisterCodec(codec)
+
+	codecAudio := webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000)
+	codecVideo := webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000)
+
+	m.RegisterCodec(codecAudio)
+	m.RegisterCodec(codecVideo)
+
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
-	track, err := webrtc.NewTrack(webrtc.DefaultPayloadTypeVP8, rand.Uint32(), "pion", "video", codec)
+
+	audioTrack, err := webrtc.NewTrack(webrtc.DefaultPayloadTypeOpus, rand.Uint32(), "pion", "audio", codecAudio)
 	if err != nil {
 		panic(err)
 	}
+	
+	videoTrack, err := webrtc.NewTrack(webrtc.DefaultPayloadTypeVP8, rand.Uint32(), "pion", "video", codecVideo)
+	if err != nil {
+		panic(err)
+	}
+
 	return &MediaRoom{
 		RoomID: id,
 		api:    api,
-		track:  track,
+		audioTrack: audioTrack,
+		videoTrack: videoTrack,
 	}
 }
 
