@@ -2,11 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"math/rand"
 	"time"
 
+	"github.com/pion/rtcp"
+	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v2/pkg/media/samplebuilder"
 )
 
 var peerConnectionConfig = webrtc.Configuration{
@@ -25,10 +29,10 @@ const (
 
 //MediaRoom is
 type MediaRoom struct {
-	RoomID int
-	api    *webrtc.API
-	audioTrack  *webrtc.Track
-	videoTrack  *webrtc.Track
+	RoomID     int
+	api        *webrtc.API
+	audioTrack *webrtc.Track
+	videoTrack *webrtc.Track
 }
 
 //NewMediaRoom is
@@ -47,15 +51,15 @@ func NewMediaRoom(id int) *MediaRoom {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	videoTrack, err := webrtc.NewTrack(webrtc.DefaultPayloadTypeVP8, rand.Uint32(), "pion", "video", codecVideo)
 	if err != nil {
 		panic(err)
 	}
 
 	return &MediaRoom{
-		RoomID: id,
-		api:    api,
+		RoomID:     id,
+		api:        api,
 		audioTrack: audioTrack,
 		videoTrack: videoTrack,
 	}
@@ -68,6 +72,73 @@ func (mediaRoom *MediaRoom) NewPeerConnection() *webrtc.PeerConnection {
 		panic(err)
 	}
 	return pc
+}
+
+//AddUser is
+func (mediaRoom *MediaRoom) AddUser(
+	user *User, 
+	room *Room,
+	 sd webrtc.SessionDescription,
+	  isPublisher bool) (*webrtc.SessionDescription,error) {
+	pc := mediaRoom.NewPeerConnection()
+
+	if isPublisher {
+		// Allow us to receive 1 video track
+		if _, err := pc.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
+			panic(err)
+		}
+
+		if _, err := pc.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
+			panic(err)
+		}
+
+		// Set a handler for when a new remote track starts
+		// Add the incoming track to the list of tracks maintained in the server
+		addOnTrack(pc, mediaRoom.audioTrack, mediaRoom.videoTrack)
+
+		log.Println("Publisher")
+	} else {
+		_, err := pc.AddTrack(mediaRoom.audioTrack)
+		if err != nil {
+			return nil, err
+		}
+		_, err = pc.AddTrack(mediaRoom.videoTrack)
+		if err != nil {
+			return nil, err
+		}
+		log.Println("Client")
+	}
+
+	roomUser := &RoomUser{
+		User:           user,
+		PeerConnection: pc,
+	}
+
+	room.addRoomUser(roomUser)
+
+	log.Printf("Added RoomUser id : %d. RoomUser Count : %d", user.ID, len(room.Users))
+
+	DataChannelHandler(pc, room, roomUser)
+
+	// Set the remote SessionDescription
+	err := pc.SetRemoteDescription(sd)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create answer
+	answer, err := pc.CreateAnswer(nil)
+	if err != nil {
+		panic(err)
+	}
+
+	// Sets the LocalDescription, and starts our UDP listeners
+	err = pc.SetLocalDescription(answer)
+	if err != nil {
+		panic(err)
+	}
+
+	return &answer, nil
 }
 
 //AddStreamer is
@@ -176,4 +247,57 @@ func SendChatMessage(room *Room, chatMessage *ChatMessage) {
 	for _, roomUser := range room.Users {
 		roomUser.DataChannel.Send(json)
 	}
+}
+
+
+func addOnTrack(pc *webrtc.PeerConnection, audioTrack, videoTrack *webrtc.Track) {
+	// Set a handler for when a new remote track starts, this just distributes all our packets
+	// to connected peers
+	pc.OnTrack(func(remoteTrack *webrtc.Track, receiver *webrtc.RTPReceiver) {
+		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
+		// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
+		go func() {
+			ticker := time.NewTicker(rtcpPLIInterval)
+			for range ticker.C {
+				rtcpSendErr := pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: remoteTrack.SSRC()}})
+				if rtcpSendErr != nil {
+					if rtcpSendErr == io.ErrClosedPipe {
+						return
+					}
+					log.Println(rtcpSendErr)
+				}
+			}
+		}()
+
+		log.Println("Track acquired", remoteTrack.Kind(), remoteTrack.Codec())
+			
+		builderVideo := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.VP8Packet{})
+		builderAudio := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.OpusPacket{})
+
+		for {
+			rtp, err := remoteTrack.ReadRTP()
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				log.Panic(err)
+			}
+
+			if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
+				builderAudio.Push(rtp)
+				for s := builderAudio.Pop(); s != nil; s = builderAudio.Pop() {
+					if err := audioTrack.WriteSample(*s); err != nil && err != io.ErrClosedPipe {
+						log.Panic(err)
+					}
+				}
+			} else if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+				builderVideo.Push(rtp)
+				for s := builderVideo.Pop(); s != nil; s = builderVideo.Pop() {
+					if err := videoTrack.WriteSample(*s); err != nil && err != io.ErrClosedPipe {
+						log.Panic(err)
+					}
+				}
+			}
+		}
+	})
 }
