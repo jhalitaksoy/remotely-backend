@@ -7,6 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const createTestUser = true
+
 func main() {
 	StartGin()
 }
@@ -50,6 +52,22 @@ func StartGin() *gin.Engine {
 			//stream.POST("/publish/:roomid")
 			//stream.POST("/join/:roomid")
 		}
+	}
+
+	if createTestUser {
+		println("Creating test users hlt and hlt2")
+
+		userRepository.RegisterUser(&User{
+			ID:       0,
+			Name:     "hlt",
+			Password: "asdfg",
+		})
+
+		userRepository.RegisterUser(&User{
+			ID:       0,
+			Name:     "hlt2",
+			Password: "asdfg",
+		})
 	}
 
 	if flag.Lookup("test.v") == nil {
