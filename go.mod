@@ -17,5 +17,7 @@ require (
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897 // indirect
 	golang.org/x/sys v0.0.0-20201018121011-98379d014ca7 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
-	gopkg.in/yaml.v2 v2.3.0 // indirect
+	gopkg.in/hraban/opus.v2 v2.0.0-20201025103112-d779bb1cc5a2
+	gopkg.in/yaml.v2 v2.4.0 // indirect
+
 )
