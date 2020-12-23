@@ -10,6 +10,7 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v2/pkg/media"
 	"github.com/pion/webrtc/v2/pkg/media/samplebuilder"
 )
 
@@ -76,28 +77,30 @@ func (mediaRoom *MediaRoom) NewPeerConnection() *webrtc.PeerConnection {
 
 //AddUser is
 func (mediaRoom *MediaRoom) AddUser(
-	user *User, 
+	user *User,
 	room *Room,
-	 sd webrtc.SessionDescription,
-	  isPublisher bool) (*webrtc.SessionDescription,error) {
+	sd webrtc.SessionDescription,
+	isPublisher bool) (*webrtc.SessionDescription, error) {
 	pc := mediaRoom.NewPeerConnection()
 
 	if isPublisher {
+		log.Println("Publisher")
+
 		// Allow us to receive 1 video track
 		if _, err := pc.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
 			panic(err)
 		}
 
+		// Allow us to receive 1 audio track
 		if _, err := pc.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
 			panic(err)
 		}
 
-		// Set a handler for when a new remote track starts
-		// Add the incoming track to the list of tracks maintained in the server
-		addOnTrack(pc, mediaRoom.audioTrack, mediaRoom.videoTrack)
-
-		log.Println("Publisher")
+		mediaRoom.addOnTrack(pc)
+		
 	} else {
+		log.Println("Client")
+
 		_, err := pc.AddTrack(mediaRoom.audioTrack)
 		if err != nil {
 			return nil, err
@@ -106,7 +109,6 @@ func (mediaRoom *MediaRoom) AddUser(
 		if err != nil {
 			return nil, err
 		}
-		log.Println("Client")
 	}
 
 	roomUser := &RoomUser{
@@ -139,6 +141,63 @@ func (mediaRoom *MediaRoom) AddUser(
 	}
 
 	return &answer, nil
+}
+
+func (mediaRoom *MediaRoom) addOnTrack(pc *webrtc.PeerConnection) {
+	// Set a handler for when a new remote track starts, this just distributes all our packets
+	// to connected peers
+	pc.OnTrack(func(remoteTrack *webrtc.Track, receiver *webrtc.RTPReceiver) {
+		log.Println("Track acquired", remoteTrack.Kind(), remoteTrack.Codec())
+
+		mediaRoom.onTrack(pc, remoteTrack, receiver)
+	})
+}
+
+func (mediaRoom *MediaRoom) onTrack(pc *webrtc.PeerConnection, remoteTrack *webrtc.Track, receiver *webrtc.RTPReceiver) {
+	// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
+	// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
+	sendPLIInterval(pc, remoteTrack)
+
+	builderVideo := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.VP8Packet{})
+	builderAudio := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.OpusPacket{})
+
+	for {
+		rtp, err := remoteTrack.ReadRTP()
+		if err != nil {
+			if err == io.EOF {
+				return
+			}
+			log.Panic(err)
+		}
+
+		if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
+			builderAudio.Push(rtp)
+			for s := builderAudio.Pop(); s != nil; s = builderAudio.Pop() {
+				mediaRoom.onAudioSample(pc, s)
+			}
+		} else if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
+			builderVideo.Push(rtp)
+			for s := builderVideo.Pop(); s != nil; s = builderVideo.Pop() {
+				mediaRoom.onVideoSample(pc, s)
+			}
+		}
+	}
+}
+
+func (mediaRoom *MediaRoom) onAudioSample(
+	pc *webrtc.PeerConnection,
+	sample *media.Sample) {
+	if err := mediaRoom.audioTrack.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
+		log.Panic(err)
+	}
+}
+
+func (mediaRoom *MediaRoom) onVideoSample(
+	pc *webrtc.PeerConnection,
+	sample *media.Sample) {
+	if err := mediaRoom.videoTrack.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
+		log.Panic(err)
+	}
 }
 
 //AddStreamer is
@@ -249,55 +308,20 @@ func SendChatMessage(room *Room, chatMessage *ChatMessage) {
 	}
 }
 
-
-func addOnTrack(pc *webrtc.PeerConnection, audioTrack, videoTrack *webrtc.Track) {
-	// Set a handler for when a new remote track starts, this just distributes all our packets
-	// to connected peers
-	pc.OnTrack(func(remoteTrack *webrtc.Track, receiver *webrtc.RTPReceiver) {
-		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
-		// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
-		go func() {
-			ticker := time.NewTicker(rtcpPLIInterval)
-			for range ticker.C {
-				rtcpSendErr := pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: remoteTrack.SSRC()}})
-				if rtcpSendErr != nil {
-					if rtcpSendErr == io.ErrClosedPipe {
-						return
-					}
-					log.Println(rtcpSendErr)
-				}
-			}
-		}()
-
-		log.Println("Track acquired", remoteTrack.Kind(), remoteTrack.Codec())
-			
-		builderVideo := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.VP8Packet{})
-		builderAudio := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.OpusPacket{})
-
-		for {
-			rtp, err := remoteTrack.ReadRTP()
-			if err != nil {
-				if err == io.EOF {
+func sendPLIInterval(pc *webrtc.PeerConnection, remoteTrack *webrtc.Track) {
+	// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
+	// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
+	go func() {
+		ticker := time.NewTicker(rtcpPLIInterval)
+		for range ticker.C {
+			rtcpSendErr := pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: remoteTrack.SSRC()}})
+			if rtcpSendErr != nil {
+				if rtcpSendErr == io.ErrClosedPipe {
 					return
 				}
-				log.Panic(err)
-			}
-
-			if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
-				builderAudio.Push(rtp)
-				for s := builderAudio.Pop(); s != nil; s = builderAudio.Pop() {
-					if err := audioTrack.WriteSample(*s); err != nil && err != io.ErrClosedPipe {
-						log.Panic(err)
-					}
-				}
-			} else if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
-				builderVideo.Push(rtp)
-				for s := builderVideo.Pop(); s != nil; s = builderVideo.Pop() {
-					if err := videoTrack.WriteSample(*s); err != nil && err != io.ErrClosedPipe {
-						log.Panic(err)
-					}
-				}
+				log.Println(rtcpSendErr)
 			}
 		}
-	})
+	}()
+
 }

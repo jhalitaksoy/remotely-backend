@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pion/webrtc/v2"
@@ -191,13 +192,13 @@ func sdpRoute(c *gin.Context) {
 		return
 	}
 
-	var isPublisher bool;
+	var isPublisher bool
 
-	if offer.Name == "Publisher"{
+	if offer.Name == "Publisher" {
 		isPublisher = true
-	}else if offer.Name == "Client"{
+	} else if strings.HasPrefix(offer.Name, "Client") {
 		isPublisher = false
-	}else{
+	} else {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
