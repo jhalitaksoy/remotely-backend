@@ -215,3 +215,54 @@ func sdpRoute(c *gin.Context) {
 		"SD":     answer,
 	})
 }
+
+func sdpUpdateRoute(c *gin.Context) {
+	userID, err := strconv.Atoi(c.GetHeader("userID"))
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	user := userRepository.GetUserByID(userID)
+	if user == nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	roomIDStr := c.Params.ByName("roomid")
+	roomID, err := strconv.Atoi(roomIDStr)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	room := roomRepository.GetRoomByID(roomID)
+	if room == nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	mediaRoom := mediaRoomRepository.GetMediaRoomByRoomID(room.ID)
+	if mediaRoom == nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	for _, roomUser := range room.Users {
+		if roomUser.User.ID == user.ID {
+
+			answer, err := roomUser.PeerConnection.CreateAnswer(nil)
+			if err != nil {
+				c.AbortWithError(http.StatusInternalServerError, err)
+			}
+
+			c.JSON(http.StatusAccepted, map[string]interface{}{
+				"Result": "Successfully received incoming client SDP",
+				"SD":     answer,
+			})
+
+			return
+		}
+	}
+
+	c.AbortWithStatus(http.StatusNotFound)
+}

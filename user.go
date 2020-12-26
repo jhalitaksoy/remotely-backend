@@ -69,4 +69,5 @@ type RoomUser struct {
 	User           *User
 	PeerConnection *webrtc.PeerConnection
 	DataChannel    *webrtc.DataChannel
+	AudioTrack     *webrtc.Track
 }

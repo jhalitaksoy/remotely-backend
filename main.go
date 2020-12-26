@@ -48,9 +48,15 @@ func StartGin() *gin.Engine {
 		stream := r.Group("/stream")
 		{
 			stream.POST("/sdp/:roomid", sdpRoute)
+			stream.POST("/sdp2/:roomid", sdpUpdateRoute)
 			//stream.POST("/audio/sdp/:roomid", sdpAudioRoute)
 			//stream.POST("/publish/:roomid")
 			//stream.POST("/join/:roomid")
+		}
+
+		stream2 := r.Group("/stream2")
+		{
+			stream2.POST("/sdp/:roomid", sdpUpdateRoute)
 		}
 	}
 
