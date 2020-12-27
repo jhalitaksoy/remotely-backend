@@ -250,7 +250,7 @@ func (mediaRoom *MediaRoom) onAudioSample(
 func (mediaRoom *MediaRoom) onVideoSample(
 	roomUser *RoomUser,
 	sample *media.Sample) {
-	if err := mediaRoom.findAudioTrackByUser(roomUser.User).Track.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
+	if err := mediaRoom.videoTrack.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
 		log.Panic(err)
 	}
 }
