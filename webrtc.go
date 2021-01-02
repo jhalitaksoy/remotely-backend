@@ -89,9 +89,15 @@ func (mediaRoom *MediaRoom) NewPeerConnection() *webrtc.PeerConnection {
 	return pc
 }
 
-func (mediaRoom *MediaRoom) findSuitableAudioTrack() *UserAudioTrack {
+func (mediaRoom *MediaRoom) findSuitableAudioTrack(userID int) *UserAudioTrack {
 	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
-		if userAudioTrack.User == nil {
+		if userAudioTrack.User != nil {
+			if userAudioTrack.User.ID == userID {
+				log.Println("Used old track")
+				return userAudioTrack
+			}
+		} else {
+			log.Println("Used new track")
 			return userAudioTrack
 		}
 	}
@@ -125,7 +131,7 @@ func (mediaRoom *MediaRoom) AddUser(
 
 	room.addRoomUser(roomUser)
 
-	userAudioTrack := mediaRoom.findSuitableAudioTrack()
+	userAudioTrack := mediaRoom.findSuitableAudioTrack(user.ID)
 	if userAudioTrack == nil {
 		print("Room is full!")
 		return nil, errors.New("Room is full")
