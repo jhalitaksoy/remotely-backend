@@ -66,7 +66,20 @@ func (repo *UserRepositoryMock) GetUserByID(ID int) *User {
 
 //RoomUser is
 type RoomUser struct {
-	User           *User
-	PeerConnection *webrtc.PeerConnection
-	DataChannel    *webrtc.DataChannel
+	User                 *User
+	PeerConnection       *webrtc.PeerConnection
+	DataChannel          *webrtc.DataChannel
+}
+
+//NewRoomUser is
+func NewRoomUser(user *User, peerConnection *webrtc.PeerConnection) *RoomUser {
+	return &RoomUser{
+		User:           user,
+		PeerConnection: peerConnection,
+	}
+}
+
+//SetDataChannel is
+func (roomUser *RoomUser) SetDataChannel(dataChannel *webrtc.DataChannel){
+	roomUser.DataChannel = dataChannel
 }
