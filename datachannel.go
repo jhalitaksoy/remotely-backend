@@ -12,6 +12,10 @@ type MessageType int8
 
 const (
 	chatMessage MessageType = iota
+	surveyCreate
+	surveyVote
+	surveyUpdate
+	surveyEnd
 )
 
 //DataChannelUser is
@@ -50,7 +54,6 @@ func DataChannelHandler(pc *webrtc.PeerConnection, room *Room, roomUser *RoomUse
 		})
 
 		d.OnMessage(func(msg webrtc.DataChannelMessage) {
-			log.Println(msg)
 			onMessage(room, roomUser, msg)
 		})
 	})
@@ -66,6 +69,10 @@ func onMessage(room *Room, roomUser *RoomUser, msg webrtc.DataChannelMessage) {
 	case chatMessage:
 		{
 			onChatMessage(room, roomUser, msg.Data[1:len])
+		}
+	case surveyCreate:
+		{
+			onSurveyCreate(room, roomUser, msg.Data[1:len])
 		}
 	}
 }
@@ -93,7 +100,7 @@ func sendMessage(dataChannel *webrtc.DataChannel, messageType MessageType, messa
 
 func onChatMessage(room *Room, roomUser *RoomUser, data []byte) {
 	var message ChatMessage
-	err := json.Unmarshal(data,	&message)
+	err := json.Unmarshal(data, &message)
 	if err != nil {
 		panic(err)
 	}
@@ -121,4 +128,24 @@ func SendChatMessage(room *Room, message *ChatMessage) {
 	for _, user := range room.Users {
 		sendMessage(user.DataChannel, chatMessage, message)
 	}
+}
+
+func onSurveyCreate(room *Room, roomUser *RoomUser, data []byte) {
+	var survey Survey
+	err := json.Unmarshal(data, &survey)
+	if err != nil {
+		panic(err)
+	}
+
+	room.addSurvey(&survey)
+
+	for _, user := range room.Users {
+		sendNewSurvey(user.DataChannel, &survey)
+	}
+
+	log.Println("On New Survey")
+}
+
+func sendNewSurvey(datachannel *webrtc.DataChannel, survey *Survey) {
+	sendMessage(datachannel, surveyCreate, survey)
 }

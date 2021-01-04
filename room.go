@@ -2,11 +2,12 @@ package main
 
 //Room is
 type Room struct {
-	ID    int
-	Name  string
-	Owner *User
-	Users []*RoomUser
+	ID           int
+	Name         string
+	Owner        *User
+	Users        []*RoomUser
 	ChatMessages []*ChatMessage
+	Surveys      []*Survey
 }
 
 //RoomRepository is
@@ -33,6 +34,10 @@ func (room *Room) addRoomUser(newRoomUser *RoomUser) {
 
 func (room *Room) addChatMessage(chatMessage *ChatMessage) {
 	room.ChatMessages = append(room.ChatMessages, chatMessage)
+}
+
+func (room *Room) addSurvey(survey *Survey) {
+	room.Surveys = append(room.Surveys, survey)
 }
 
 var roomRepository RoomRepository = &RoomRepositoryMock{lastRoomID: -1, userRoomsTable: make(map[*User][]*Room)}
