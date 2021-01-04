@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"net/http"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -24,8 +25,13 @@ func StartGin() *gin.Engine {
 	//config.AllowOrigins = []string{"http://localhost:3000"}
 	r.Use(cors.New(config))
 
-	r.GET("/ping", func(c *gin.Context) {
+	r.GET("/", func(c *gin.Context) {
 		c.String(200, "Hello :)")
+	})
+
+	r.GET("/ssl", func(c *gin.Context) {
+		c.Redirect(http.StatusTemporaryRedirect, "https://remotely-sigma.vercel.app/")
+		c.AbortWithStatus(http.StatusTemporaryRedirect)
 	})
 	user := r.Group("/user")
 	{
