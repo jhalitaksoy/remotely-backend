@@ -8,6 +8,30 @@ type Room struct {
 	Users        []*RoomUser
 	ChatMessages []*ChatMessage
 	Surveys      []*Survey
+	lastSurveyID int
+}
+
+//CreateNewSurvey create new Survey from given survey
+func (room *Room) CreateNewSurvey(survey *Survey) *Survey {
+	room.lastSurveyID += 1
+
+	for i, option := range survey.Options {
+		option.ID = i
+	}
+
+	return &Survey{
+		ID:               room.lastSurveyID,
+		Text:             survey.Text,
+		Owner:            survey.Owner,
+		Options:          survey.Options,
+		Votes:            map[int]*SurveyOption{},
+		ParticipantCount: 0,
+	}
+}
+
+//VoteSurvey ...
+func (room *Room) VoteSurvey(id int, user *User) {
+
 }
 
 //RoomRepository is
@@ -40,6 +64,28 @@ func (room *Room) addSurvey(survey *Survey) {
 	room.Surveys = append(room.Surveys, survey)
 }
 
+func (room *Room) removeSurvey(survey *Survey) {
+	for i, _survey := range room.Surveys {
+		if _survey == survey {
+			room.removeSurveyAt(i)
+			break
+		}
+	}
+}
+
+func (room *Room) removeSurveyAt(s int) {
+	room.Surveys = append(room.Surveys[:s], room.Surveys[s+1:]...)
+}
+
+func (room *Room) getSurveyByID(id int) *Survey {
+	for _, survey := range room.Surveys {
+		if survey.ID == id {
+			return survey
+		}
+	}
+	return nil
+}
+
 var roomRepository RoomRepository = &RoomRepositoryMock{lastRoomID: -1, userRoomsTable: make(map[*User][]*Room)}
 
 // RoomRepositoryMock is
@@ -54,6 +100,7 @@ func (repo *RoomRepositoryMock) CreateRoom(user *User, room *Room) bool {
 	repo.lastRoomID = repo.lastRoomID + 1
 	room.ID = repo.lastRoomID
 	room.Owner = user
+	room.lastSurveyID = 0
 	repo.JoinRoom(user, room)
 	repo.rooms = append(repo.rooms, room)
 	return true

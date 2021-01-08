@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/pion/webrtc/v2"
 )
@@ -65,6 +66,12 @@ func onMessage(room *Room, roomUser *RoomUser, msg webrtc.DataChannelMessage) {
 
 	messageType := MessageType(msg.Data[0])
 
+	wholeData := make([]byte, len)
+
+	for i := 0; i < len; i++ {
+		wholeData[i] = msg.Data[i]
+	}
+
 	switch messageType {
 	case chatMessage:
 		{
@@ -73,6 +80,10 @@ func onMessage(room *Room, roomUser *RoomUser, msg webrtc.DataChannelMessage) {
 	case surveyCreate:
 		{
 			onSurveyCreate(room, roomUser, msg.Data[1:len])
+		}
+	case surveyVote:
+		{
+			onSurveyVote(room, roomUser, msg.Data[1:len])
 		}
 	}
 }
@@ -130,22 +141,92 @@ func SendChatMessage(room *Room, message *ChatMessage) {
 	}
 }
 
+type surveyCreateParams struct {
+	Text    string          `json:"text"`
+	Options []*SurveyOption `json:"options"`
+}
+
 func onSurveyCreate(room *Room, roomUser *RoomUser, data []byte) {
-	var survey Survey
-	err := json.Unmarshal(data, &survey)
+	var surveyCreateParams surveyCreateParams
+	err := json.Unmarshal(data, &surveyCreateParams)
 	if err != nil {
 		panic(err)
 	}
 
-	room.addSurvey(&survey)
-
-	for _, user := range room.Users {
-		sendNewSurvey(user.DataChannel, &survey)
+	surveyFromUser := &Survey{
+		Text:    surveyCreateParams.Text,
+		Options: surveyCreateParams.Options,
 	}
 
+	survey := room.CreateNewSurvey(surveyFromUser)
+	room.addSurvey(survey)
+
+	sendNewSurveyToRoom(room, survey)
 	log.Println("On New Survey")
+
+	go func() {
+		time.Sleep(surveyEndDuration)
+		log.Println("On Survey Destroy! Survey ID : ", survey.ID)
+
+		surveyEndMessage := map[string]interface{}{
+			"surveyID": survey.ID,
+		}
+
+		room.removeSurvey(survey)
+
+		sendMessageToRoom(room, surveyEnd, surveyEndMessage)
+	}()
 }
 
-func sendNewSurvey(datachannel *webrtc.DataChannel, survey *Survey) {
-	sendMessage(datachannel, surveyCreate, survey)
+func sendNewSurveyToRoom(room *Room, survey *Survey) {
+	sendMessageToRoom(room, surveyCreate, survey)
+}
+
+func onSurveyVote(room *Room, roomUser *RoomUser, data []byte) {
+
+	var vote Vote
+	err := json.Unmarshal(data, &vote)
+	if err != nil {
+		panic(err)
+	}
+
+	log.Printf("On Vote Survey. Room : %d, User : %d, Survey : %d, Vote : %d",
+		room.ID, roomUser.User.ID, vote.SurveyID, vote.OptionID)
+
+	survey := room.getSurveyByID(vote.SurveyID)
+
+	if survey != nil {
+		survey.Vote(roomUser.User, vote.OptionID)
+		sendSurveyUpdatedToRoom(room, survey)
+	} else {
+		log.Printf("Survey Not Found! Room : %d, User : %d, Survey : %d, Vote : %d",
+			room.ID, roomUser.User.ID, vote.SurveyID, vote.OptionID)
+	}
+}
+
+func sendSurveyUpdatedToRoom(room *Room, survey *Survey) {
+	sendMessageToRoom(room, surveyUpdate, survey)
+}
+
+func sendMessageToRoom(room *Room, messageType MessageType, message interface{}) {
+	strMessage, err := json.Marshal(message)
+	if err != nil {
+		panic(err)
+	}
+
+	messageTypeLength := 1
+	messageLenght := len(strMessage)
+	length := messageTypeLength + messageLenght
+
+	bytes := make([]byte, length)
+
+	bytes[0] = byte(messageType)
+
+	for i, char := range strMessage {
+		bytes[i+messageTypeLength] = char
+	}
+
+	for _, user := range room.Users {
+		user.DataChannel.Send(bytes)
+	}
 }
