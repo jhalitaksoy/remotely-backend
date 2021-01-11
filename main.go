@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const createTestUser = true
+const createTestUser = false
 
 func main() {
 	StartGin()
