@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const createTestUser = false
+const createTestUser = true
 
 func main() {
 	StartGin()
@@ -80,6 +80,7 @@ func StartGin() *gin.Engine {
 		r.Run(":8080")
 	} else {
 		go r.Run(":8080")
+		Info("Server Started")
 	}
 	return r
 }
