@@ -60,7 +60,7 @@ func NewAudioTrack() *webrtc.Track {
 }
 
 func NewVideoTrack() *webrtc.Track {
-	videoCodec := NewRTPOpusCodec()
+	videoCodec := NewRTPVP8Codec()
 	videoTrack, err := webrtc.NewTrack(webrtc.DefaultPayloadTypeVP8, rand.Uint32(), "pion", "video", videoCodec)
 	if err != nil {
 		panic(err)
@@ -80,7 +80,48 @@ func CreateUserAudioTracks() [MaxUserSize]*UserAudioTrack {
 	return userAudioTracks
 }
 
-func OnPeerConnectionChange(room *Room, mediaRoom *MediaRoom, roomUser *RoomUser, pcs webrtc.PeerConnectionState) {
+func NewPeerConnection(api *webrtc.API) *webrtc.PeerConnection {
+	pc, err := api.NewPeerConnection(peerConnectionConfig)
+	if err != nil {
+		panic(err)
+	}
+	return pc
+}
+
+// Allow us to receive 1 audio track
+func AllowReceiveAudioTrack(pc *webrtc.PeerConnection) {
+	if _, err := pc.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
+		panic(err)
+	}
+}
+
+// Allow us to receive 1 video track
+func AllowReceiveVideoTrack(pc *webrtc.PeerConnection) {
+	if _, err := pc.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
+		panic(err)
+	}
+}
+
+//Allow us to send audio track to client
+func AllowSendAudioTrack(pc *webrtc.PeerConnection, audioTrack *webrtc.Track) {
+	_, err := pc.AddTrack(audioTrack)
+	if err != nil {
+		panic(err)
+	}
+}
+
+//Allow us to send video track to client
+func AllowSendVideoTrack(pc *webrtc.PeerConnection, videoTrack *webrtc.Track) {
+	_, err := pc.AddTrack(videoTrack)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func OnPeerConnectionChange(context *Context, pcs webrtc.PeerConnectionState) {
+	room := context.Room
+	mediaRoom := context.MediaRoom
+	roomUser := context.RoomUser
 	switch pcs {
 	case webrtc.PeerConnectionStateNew:
 	case webrtc.PeerConnectionStateConnecting:
@@ -125,4 +166,8 @@ func sendPLIInterval(pc *webrtc.PeerConnection, remoteTrack *webrtc.Track) {
 type UserAudioTrack struct {
 	User  *User
 	Track *webrtc.Track
+}
+
+func (userAudioTrack *UserAudioTrack) IsSameUser(user *User) bool {
+	return userAudioTrack.User != nil && userAudioTrack.User.ID == user.ID
 }

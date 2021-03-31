@@ -185,12 +185,6 @@ func sdpRoute(c *gin.Context) {
 		return
 	}
 
-	mediaRoom := mediaRoomRepository.GetMediaRoomByRoomID(room.ID)
-	if mediaRoom == nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
 	var offer message
 	decoder := json.NewDecoder(c.Request.Body)
 	if err := decoder.Decode(&offer); err != nil {
@@ -209,12 +203,13 @@ func sdpRoute(c *gin.Context) {
 		return
 	}
 
-	answer, err := mediaRoom.AddUser(user, room, offer.SD, isPublisher)
+	answer, err := room.JoinUserToRoom(user, offer.SD, isPublisher)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+
 	c.JSON(http.StatusAccepted, map[string]interface{}{
 		"Result": "Successfully received incoming client SDP",
 		"SD":     answer,

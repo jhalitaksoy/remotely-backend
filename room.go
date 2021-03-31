@@ -1,5 +1,12 @@
 package main
 
+import (
+	"errors"
+	"log"
+
+	"github.com/pion/webrtc/v2"
+)
+
 //Room is
 type Room struct {
 	ID           int
@@ -32,6 +39,26 @@ func (room *Room) CreateNewSurvey(survey *Survey) *Survey {
 //VoteSurvey ...
 func (room *Room) VoteSurvey(id int, user *User) {
 
+}
+
+func (room *Room) JoinUserToRoom(user *User, sd webrtc.SessionDescription, isPublisher bool) (*webrtc.SessionDescription, error) {
+	mediaRoom := mediaRoomRepository.GetMediaRoomByRoomID(room.ID)
+	if mediaRoom == nil {
+		return nil, errors.New("media room not found")
+	}
+
+	pc := mediaRoom.NewPeerConnection()
+	roomUser := NewRoomUser(user, pc)
+	room.addRoomUser(roomUser)
+
+	context := NewContext(room, mediaRoom, roomUser, isPublisher)
+
+	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		log.Println(pcs.String())
+		OnPeerConnectionChange(context, pcs)
+	})
+
+	return mediaRoom.JoinUser(context, sd)
 }
 
 //RoomRepository is

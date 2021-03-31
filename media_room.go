@@ -13,11 +13,10 @@ import (
 
 //MediaRoom is
 type MediaRoom struct {
-	RoomID int
-	api    *webrtc.API
-	//audioTrack *webrtc.Track
+	RoomID          int
+	API             *webrtc.API
 	UserAudioTracks [MaxUserSize]*UserAudioTrack
-	videoTrack      *webrtc.Track
+	VideoTrack      *webrtc.Track
 }
 
 //NewMediaRoom is
@@ -29,32 +28,29 @@ func NewMediaRoom(id int) *MediaRoom {
 	videoTrack := NewVideoTrack()
 
 	return &MediaRoom{
-		RoomID: id,
-		api:    api,
-		//audioTrack: audioTrack,
+		RoomID:          id,
+		API:             api,
 		UserAudioTracks: userAudioTracks,
-		videoTrack:      videoTrack,
+		VideoTrack:      videoTrack,
 	}
 }
 
 //NewPeerConnection is
 func (mediaRoom *MediaRoom) NewPeerConnection() *webrtc.PeerConnection {
-	pc, err := mediaRoom.api.NewPeerConnection(peerConnectionConfig)
-	if err != nil {
-		panic(err)
-	}
-	return pc
+	return NewPeerConnection(mediaRoom.API)
 }
 
-func (mediaRoom *MediaRoom) findSuitableAudioTrack(userID int) *UserAudioTrack {
+func (mediaRoom *MediaRoom) findSuitableAudioTrack(user *User) *UserAudioTrack {
 	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
 		if userAudioTrack.User != nil {
-			if userAudioTrack.User.ID == userID {
-				log.Println("Used old track")
+			if userAudioTrack.User.ID == user.ID {
+				log.Println("Used old audiotrack")
+				userAudioTrack.User = user
 				return userAudioTrack
 			}
 		} else {
-			log.Println("Used new track")
+			log.Println("Used new audio track")
+			userAudioTrack.User = user
 			return userAudioTrack
 		}
 	}
@@ -84,74 +80,37 @@ func (mediaRoom *MediaRoom) RemoveAudioTrackByUser(user *User) {
 	}
 }
 
-//AddUser is
-func (mediaRoom *MediaRoom) AddUser(
-	user *User,
-	room *Room,
-	sd webrtc.SessionDescription,
-	isPublisher bool) (*webrtc.SessionDescription, error) {
-	pc := mediaRoom.NewPeerConnection()
+//JoinUser is
+func (mediaRoom *MediaRoom) JoinUser(
+	context *Context,
+	sd webrtc.SessionDescription) (*webrtc.SessionDescription, error) {
 
-	roomUser := NewRoomUser(user, pc)
+	pc := context.RoomUser.PeerConnection
 
-	room.addRoomUser(roomUser)
-
-	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
-		log.Println(pcs.String())
-		OnPeerConnectionChange(room, mediaRoom, roomUser, pcs)
-	})
-
-	userAudioTrack := mediaRoom.findSuitableAudioTrack(user.ID)
+	userAudioTrack := mediaRoom.findSuitableAudioTrack(context.User)
 	if userAudioTrack == nil {
 		print("Room is full!")
 		return nil, errors.New("Room is full")
 	}
 
-	userAudioTrack.User = user
+	mediaRoom.allowSendAudioTrackToAllPeers(context)
 
-	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
-		if userAudioTrack.User == nil || userAudioTrack.User.ID != user.ID {
-			_, err := pc.AddTrack(userAudioTrack.Track)
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
-
-	if isPublisher {
+	if context.IsPublisher {
 		log.Println("Publisher")
-
-		// Allow us to receive 1 video track
-		if _, err := pc.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
-			panic(err)
-		}
-
-		// Allow us to receive 1 audio track
-		if _, err := pc.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
-			panic(err)
-		}
-
-		mediaRoom.addOnTrack(roomUser)
+		AllowReceiveVideoTrack(pc)
+		AllowReceiveAudioTrack(pc)
 
 	} else {
 		log.Println("Client")
-
-		_, err := pc.AddTrack(mediaRoom.videoTrack)
-		if err != nil {
-			return nil, err
-		}
-
-		// Allow us to receive 1 audio track
-		if _, err := pc.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
-			panic(err)
-		}
-
-		mediaRoom.addOnTrack(roomUser)
+		AllowSendVideoTrack(pc, mediaRoom.VideoTrack)
+		AllowReceiveAudioTrack(pc)
 	}
 
-	log.Printf("Added RoomUser id : %d. RoomUser Count : %d", user.ID, len(room.Users))
+	mediaRoom.addOnTrack(context.RoomUser)
 
-	DataChannelHandler(pc, room, mediaRoom, roomUser)
+	log.Printf("Added RoomUser id : %d. RoomUser Count : %d", context.User.ID, len(context.Room.Users))
+
+	DataChannelHandler(context)
 
 	// Set the remote SessionDescription
 	err := pc.SetRemoteDescription(sd)
@@ -172,6 +131,14 @@ func (mediaRoom *MediaRoom) AddUser(
 	}
 
 	return &answer, nil
+}
+
+func (mediaRoom *MediaRoom) allowSendAudioTrackToAllPeers(context *Context) {
+	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
+		if userAudioTrack.IsSameUser(context.User) {
+			AllowSendAudioTrack(context.RoomUser.PeerConnection, userAudioTrack.Track)
+		}
+	}
 }
 
 func (mediaRoom *MediaRoom) addOnTrack(roomUser *RoomUser) {
@@ -237,7 +204,7 @@ func (mediaRoom *MediaRoom) onAudioSample(
 func (mediaRoom *MediaRoom) onVideoSample(
 	roomUser *RoomUser,
 	sample *media.Sample) {
-	if err := mediaRoom.videoTrack.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
+	if err := mediaRoom.VideoTrack.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
 		log.Panic(err)
 	}
 }
