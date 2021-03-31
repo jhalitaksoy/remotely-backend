@@ -8,9 +8,10 @@ import (
 
 //User is
 type User struct {
-	ID       int
-	Name     string
-	Password string
+	ID        int
+	Name      string
+	Password  string
+	Anonymous bool
 }
 
 //UserRepository is
@@ -18,6 +19,9 @@ type UserRepository interface {
 	LoginUser(*User) bool
 	RegisterUser(*User) error
 	GetUserByID(int) *User
+	//NewUser() *User
+	NewAnonymousUser() *User
+	DeleteUser(ID int) bool
 }
 
 var userRepository UserRepository = &UserRepositoryMock{lastUserID: -1}
@@ -62,6 +66,31 @@ func (repo *UserRepositoryMock) GetUserByID(ID int) *User {
 		}
 	}
 	return nil
+}
+
+//NewAnonymousUser ...
+func (repo *UserRepositoryMock) NewAnonymousUser() *User {
+	user := &User{}
+	user.Anonymous = true
+	repo.lastUserID = repo.lastUserID + 1
+	user.ID = repo.lastUserID
+	repo.users = append(repo.users, user)
+	return user
+}
+
+func (repo *UserRepositoryMock) DeleteUser(ID int) bool {
+	for i, eachUser := range repo.users {
+		if eachUser.ID == ID {
+			repo.users = removeUserByIndex(repo.users, i)
+			return true
+		}
+	}
+	return false
+}
+
+func removeUserByIndex(s []*User, i int) []*User {
+	s[i] = s[len(s)-1]
+	return s[:len(s)-1]
 }
 
 //RoomUser is

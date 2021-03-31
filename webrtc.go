@@ -115,6 +115,17 @@ func (mediaRoom *MediaRoom) findAudioTrackByUser(user *User) *UserAudioTrack {
 	return nil
 }
 
+func (mediaRoom *MediaRoom) RemoveAudioTrackByUser(user *User) {
+	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
+		if userAudioTrack.User == nil {
+			continue
+		}
+		if userAudioTrack.User.ID == user.ID {
+			userAudioTrack.User = nil
+		}
+	}
+}
+
 //AddUser is
 func (mediaRoom *MediaRoom) AddUser(
 	user *User,
@@ -124,8 +135,17 @@ func (mediaRoom *MediaRoom) AddUser(
 	pc := mediaRoom.NewPeerConnection()
 
 	roomUser := NewRoomUser(user, pc)
-	
+
 	room.addRoomUser(roomUser)
+
+	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		log.Println(pcs.String())
+		OnPeerConnectionChange(room, mediaRoom, roomUser, pcs)
+	})
+
+	pc.OnICEConnectionStateChange(func(is webrtc.ICEConnectionState) {
+		//log.Println(is.String())
+	})
 
 	userAudioTrack := mediaRoom.findSuitableAudioTrack(user.ID)
 	if userAudioTrack == nil {
@@ -177,7 +197,7 @@ func (mediaRoom *MediaRoom) AddUser(
 
 	log.Printf("Added RoomUser id : %d. RoomUser Count : %d", user.ID, len(room.Users))
 
-	DataChannelHandler(pc, room, roomUser)
+	DataChannelHandler(pc, room, mediaRoom, roomUser)
 
 	// Set the remote SessionDescription
 	err := pc.SetRemoteDescription(sd)
@@ -198,6 +218,29 @@ func (mediaRoom *MediaRoom) AddUser(
 	}
 
 	return &answer, nil
+}
+
+func OnPeerConnectionChange(room *Room, mediaRoom *MediaRoom, roomUser *RoomUser, pcs webrtc.PeerConnectionState) {
+	switch pcs {
+	case webrtc.PeerConnectionStateNew:
+	case webrtc.PeerConnectionStateConnecting:
+	case webrtc.PeerConnectionStateConnected:
+	case webrtc.PeerConnectionStateFailed:
+		ClearUser(room, mediaRoom, roomUser)
+	case webrtc.PeerConnectionStateClosed:
+		ClearUser(room, mediaRoom, roomUser)
+	case webrtc.PeerConnectionStateDisconnected:
+		ClearUser(room, mediaRoom, roomUser)
+	}
+}
+
+func ClearUser(room *Room, mediaRoom *MediaRoom, roomUser *RoomUser) {
+	log.Println("ClearUser()")
+	mediaRoom.RemoveAudioTrackByUser(roomUser.User)
+	room.RemoveRoomUser(roomUser)
+	if roomUser.User.Anonymous {
+		userRepository.DeleteUser(roomUser.User.ID)
+	}
 }
 
 func (mediaRoom *MediaRoom) addOnTrack(roomUser *RoomUser) {
@@ -226,11 +269,21 @@ func (mediaRoom *MediaRoom) onTrack(roomUser *RoomUser, remoteTrack *webrtc.Trac
 			}
 			log.Panic(err)
 		}
+		userAudioTrack := mediaRoom.findAudioTrackByUser(roomUser.User)
+		if userAudioTrack == nil {
+			log.Println("User Audio track was nil!")
+			break
+		}
 
+		audioTrack := userAudioTrack.Track
+		if audioTrack == nil {
+			log.Println("Audio track was nil!")
+			break
+		}
 		if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
 			builderAudio.Push(rtp)
 			for s := builderAudio.Pop(); s != nil; s = builderAudio.Pop() {
-				mediaRoom.onAudioSample(roomUser, s)
+				mediaRoom.onAudioSample(roomUser, audioTrack, s)
 			}
 		} else if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
 			builderVideo.Push(rtp)
@@ -243,8 +296,9 @@ func (mediaRoom *MediaRoom) onTrack(roomUser *RoomUser, remoteTrack *webrtc.Trac
 
 func (mediaRoom *MediaRoom) onAudioSample(
 	roomUser *RoomUser,
+	track *webrtc.Track,
 	sample *media.Sample) {
-	if err := mediaRoom.findAudioTrackByUser(roomUser.User).Track.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
+	if err := track.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
 		log.Panic(err)
 	}
 }

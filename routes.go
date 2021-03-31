@@ -156,14 +156,20 @@ type message struct {
 
 func sdpRoute(c *gin.Context) {
 	userID, err := strconv.Atoi(c.GetHeader("userID"))
-	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	user := userRepository.GetUserByID(userID)
-	if user == nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
+	/*if err != nil {
+		//c.AbortWithStatus(http.StatusBadRequest)
+		//return
+	}*/
+	var user *User
+
+	if err == nil {
+		user = userRepository.GetUserByID(userID)
+		if user == nil {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+	} else {
+		user = userRepository.NewAnonymousUser()
 	}
 
 	roomIDStr := c.Params.ByName("roomid")
@@ -209,9 +215,29 @@ func sdpRoute(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-
 	c.JSON(http.StatusAccepted, map[string]interface{}{
 		"Result": "Successfully received incoming client SDP",
 		"SD":     answer,
 	})
+}
+
+func listUsers(c *gin.Context) {
+
+	roomIDStr := c.Params.ByName("roomid")
+	roomID, err := strconv.Atoi(roomIDStr)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+	}
+	room := roomRepository.GetRoomByID(roomID)
+	if room == nil {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	userNames := []string{}
+	for _, roomUser := range room.Users {
+		userNames = append(userNames, roomUser.User.Name)
+	}
+
+	c.JSON(http.StatusOK, userNames)
 }

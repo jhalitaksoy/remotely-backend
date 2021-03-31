@@ -86,6 +86,21 @@ func (room *Room) getSurveyByID(id int) *Survey {
 	return nil
 }
 
+func (room *Room) RemoveRoomUser(roomUser *RoomUser) bool {
+	for i, eachRoomUser := range room.Users {
+		if eachRoomUser.User.ID == roomUser.User.ID {
+			room.Users = removeRoomUserByIndex(room.Users, i)
+			return true
+		}
+	}
+	return false
+}
+
+func removeRoomUserByIndex(s []*RoomUser, i int) []*RoomUser {
+	s[i] = s[len(s)-1]
+	return s[:len(s)-1]
+}
+
 var roomRepository RoomRepository = &RoomRepositoryMock{lastRoomID: -1, userRoomsTable: make(map[*User][]*Room)}
 
 // RoomRepositoryMock is

@@ -39,24 +39,33 @@ func StartGin() *gin.Engine {
 		user.POST("/register", registerRoute)
 	}
 
+	stream := r.Group("/stream")
+	{
+		stream.POST("/sdp/:roomid", sdpRoute)
+		//stream.POST("/audio/sdp/:roomid", sdpAudioRoute)
+		//stream.POST("/publish/:roomid")
+		//stream.POST("/join/:roomid")
+	}
+
+	test := r.Group("/test")
+	{
+		test.GET("/users/:roomid", listUsers)
+	}
+
+	room := r.Group("/room")
+	{
+		room.POST("/get/:roomid", getRoomRoute)
+		//Add Test
+		room.POST("/chat/:roomid", chatRoomRoute)
+	}
+
 	r.Use(authRequired)
 	{
 		room := r.Group("/room")
 		{
-			room.POST("/get/:roomid", getRoomRoute)
 			room.POST("/create", createRoomRoute)
 			room.POST("/join/:roomid", joinRoomRoute)
 			room.POST("/listRooms", listRoomsRoute)
-			//Add Test
-			room.POST("/chat/:roomid", chatRoomRoute)
-		}
-
-		stream := r.Group("/stream")
-		{
-			stream.POST("/sdp/:roomid", sdpRoute)
-			//stream.POST("/audio/sdp/:roomid", sdpAudioRoute)
-			//stream.POST("/publish/:roomid")
-			//stream.POST("/join/:roomid")
 		}
 	}
 

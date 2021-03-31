@@ -39,7 +39,7 @@ type ChatMessageData struct {
 }
 
 //DataChannelHandler is
-func DataChannelHandler(pc *webrtc.PeerConnection, room *Room, roomUser *RoomUser) {
+func DataChannelHandler(pc *webrtc.PeerConnection, room *Room, mediaRoom *MediaRoom, roomUser *RoomUser) {
 	// Register data channel creation handling
 	pc.OnDataChannel(func(d *webrtc.DataChannel) {
 		log.Printf("New DataChannel %s - %d\n", d.Label(), d.ID())
