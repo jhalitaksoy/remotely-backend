@@ -32,7 +32,7 @@ func TestRegisterUser(t *testing.T) {
 }
 
 func TestAddUserHttp(t *testing.T) {
-	ts := httptest.NewServer(StartGin())
+	ts := httptest.NewServer(startGin())
 	defer ts.Close()
 
 	user := User{Name: "Alice", Password: "1234"}
@@ -40,7 +40,7 @@ func TestAddUserHttp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	url := fmt.Sprintf("%s/user/register", ts.URL)
 
 	resp, err := http.Post(
@@ -66,7 +66,6 @@ func TestAddUserHttp(t *testing.T) {
 		fmt.Printf("User id is %d", bodyInt)
 		fmt.Println("")
 	}
-
 
 	//Login
 

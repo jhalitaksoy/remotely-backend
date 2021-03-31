@@ -23,7 +23,7 @@ func TestRoom(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ts := httptest.NewServer(StartGin())
+	ts := httptest.NewServer(startGin())
 	defer ts.Close()
 
 	//Create Room

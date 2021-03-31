@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"net/http"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -11,11 +10,10 @@ import (
 const createTestUser = true
 
 func main() {
-	StartGin()
+	startGin()
 }
 
-//StartGin is
-func StartGin() *gin.Engine {
+func startGin() *gin.Engine {
 	r := gin.Default()
 
 	// TODO : Look Before Production (Security)
@@ -26,13 +24,9 @@ func StartGin() *gin.Engine {
 	r.Use(cors.New(config))
 
 	r.GET("/", func(c *gin.Context) {
-		c.String(200, "Hello :)")
+		c.String(200, "Server is Running!")
 	})
 
-	r.GET("/ssl", func(c *gin.Context) {
-		c.Redirect(http.StatusTemporaryRedirect, "https://remotely-sigma.vercel.app/")
-		c.AbortWithStatus(http.StatusTemporaryRedirect)
-	})
 	user := r.Group("/user")
 	{
 		user.POST("/login", loginRoute)
@@ -42,11 +36,9 @@ func StartGin() *gin.Engine {
 	stream := r.Group("/stream")
 	{
 		stream.POST("/sdp/:roomid", sdpRoute)
-		//stream.POST("/audio/sdp/:roomid", sdpAudioRoute)
-		//stream.POST("/publish/:roomid")
-		//stream.POST("/join/:roomid")
 	}
 
+	//TODO : Remove later
 	test := r.Group("/test")
 	{
 		test.GET("/users/:roomid", listUsers)
