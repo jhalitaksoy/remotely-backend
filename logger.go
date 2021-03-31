@@ -28,17 +28,20 @@ func Error(message string) {
 
 // Infof ...
 func Infof(format string, a ...interface{}) {
-	Log(info, fmt.Sprintf(format, a))
+	message := fmt.Sprintf(format, a...)
+	Log(info, message)
 }
 
 // Warnf ...
 func Warnf(format string, a ...interface{}) {
-	Log(warn, fmt.Sprintf(format, a))
+	message := fmt.Sprintf(format, a...)
+	Log(warn, message)
 }
 
 // Errorf ...
 func Errorf(format string, a ...interface{}) {
-	Log(err, fmt.Sprintf(format, a))
+	message := fmt.Sprintf(format, a...)
+	Log(err, message)
 }
 
 // Log ...

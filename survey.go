@@ -72,7 +72,7 @@ func (survey *Survey) Vote(user *User, optionID int) error {
 		}
 	}
 	if option == nil {
-		return fmt.Errorf("Option Not Found in Survey, Option ID : %d", optionID)
+		return fmt.Errorf("option not found in survey, option ID : %d", optionID)
 	}
 	option.Count++
 	survey.Votes[user.ID] = option
