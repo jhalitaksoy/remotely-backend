@@ -95,15 +95,15 @@ func (mediaRoom *MediaRoom) JoinUser(
 
 	mediaRoom.allowSendAudioTrackToAllPeers(context)
 
+	AllowReceiveAudioTrack(pc)
+
 	if context.IsPublisher {
 		log.Println("Publisher")
 		AllowReceiveVideoTrack(pc)
-		AllowReceiveAudioTrack(pc)
 
 	} else {
 		log.Println("Client")
 		AllowSendVideoTrack(pc, mediaRoom.VideoTrack)
-		AllowReceiveAudioTrack(pc)
 	}
 
 	mediaRoom.addOnTrack(context.RoomUser)
@@ -192,18 +192,13 @@ func (mediaRoom *MediaRoom) onTrack(roomUser *RoomUser, remoteTrack *webrtc.Trac
 	}
 }
 
-func (mediaRoom *MediaRoom) onAudioSample(
-	roomUser *RoomUser,
-	track *webrtc.Track,
-	sample *media.Sample) {
+func (mediaRoom *MediaRoom) onAudioSample(roomUser *RoomUser, track *webrtc.Track, sample *media.Sample) {
 	if err := track.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
 		log.Panic(err)
 	}
 }
 
-func (mediaRoom *MediaRoom) onVideoSample(
-	roomUser *RoomUser,
-	sample *media.Sample) {
+func (mediaRoom *MediaRoom) onVideoSample(roomUser *RoomUser, sample *media.Sample) {
 	if err := mediaRoom.VideoTrack.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
 		log.Panic(err)
 	}
