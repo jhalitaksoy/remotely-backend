@@ -236,10 +236,10 @@ func OnPeerConnectionChange(room *Room, mediaRoom *MediaRoom, roomUser *RoomUser
 
 func ClearUser(room *Room, mediaRoom *MediaRoom, roomUser *RoomUser) {
 	log.Println("ClearUser()")
-	mediaRoom.RemoveAudioTrackByUser(roomUser.User)
-	room.RemoveRoomUser(roomUser)
 	if roomUser.User.Anonymous {
+		mediaRoom.RemoveAudioTrackByUser(roomUser.User)
 		userRepository.DeleteUser(roomUser.User.ID)
+		room.RemoveRoomUser(roomUser)
 	}
 }
 
