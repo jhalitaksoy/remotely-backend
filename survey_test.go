@@ -8,9 +8,9 @@ import (
 
 func TestSurveyJson(t *testing.T) {
 	user := &User{
-		ID:       0,
-		Name:     "hlt",
-		Password: "1234",
+		ID:   0,
+		Name: "hlt",
+		/*Password: "1234",*/
 	}
 
 	surveyOption1 := &SurveyOption{

@@ -2,26 +2,66 @@ package main
 
 import (
 	"flag"
+	"log"
+	"os"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
-const createTestUser = true
+var secretKey string
+
+const jwtExpireTime = time.Hour * 24
+
+var myContext *MyContext
 
 func main() {
-	startGin()
+
+	LoadEnviromentVariables()
+
+	myContext = newMyContext()
+
+	port := os.Getenv("PORT")
+	if len(port) == 0 {
+		port = ":8080"
+	}
+
+	startGin(port)
 }
 
-func startGin() *gin.Engine {
+func LoadEnviromentVariables() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("Error : %v\n", err)
+	}
+
+	secretKey = os.Getenv("SECRET_KEY")
+	if len(secretKey) == 0 {
+		panic("Secret key emty")
+	}
+}
+
+func CorsConfig() cors.Config {
+	return cors.Config{
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
+		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
+		AllowAllOrigins:  true, //Change later
+	}
+}
+
+func startGin(port string) *gin.Engine {
 	r := gin.Default()
 
 	// TODO : Look Before Production (Security)
-	config := cors.DefaultConfig()
+	/*config := cors.DefaultConfig()
 	config.AllowHeaders = append(config.AllowHeaders, "userid")
 	config.AllowAllOrigins = true
-	//config.AllowOrigins = []string{"http://localhost:3000"}
-	r.Use(cors.New(config))
+	//config.AllowOrigins = []string{"http://localhost:3000"}*/
+	r.Use(cors.New(CorsConfig()))
 
 	r.GET("/", func(c *gin.Context) {
 		c.String(200, "Server is Running!")
@@ -29,8 +69,8 @@ func startGin() *gin.Engine {
 
 	user := r.Group("/user")
 	{
-		user.POST("/login", loginRoute)
-		user.POST("/register", registerRoute)
+		user.POST("/login", handleLogin)
+		user.POST("/register", handleRegister)
 	}
 
 	stream := r.Group("/stream")
@@ -51,7 +91,7 @@ func startGin() *gin.Engine {
 		room.POST("/chat/:roomid", chatRoomRoute)
 	}
 
-	r.Use(authRequired)
+	r.Use(requiredAuthentication)
 	{
 		room := r.Group("/room")
 		{
@@ -61,7 +101,7 @@ func startGin() *gin.Engine {
 		}
 	}
 
-	if createTestUser {
+	/*if createTestUser {
 		println("Creating test users hlt and hlt2")
 
 		userRepository.RegisterUser(&User{
@@ -75,12 +115,12 @@ func startGin() *gin.Engine {
 			Name:     "hlt2",
 			Password: "asdfg",
 		})
-	}
+	}*/
 
 	if flag.Lookup("test.v") == nil {
-		r.Run(":8080")
+		r.Run(port)
 	} else {
-		go r.Run(":8080")
+		go r.Run(port)
 		Info("Server Started")
 	}
 	return r

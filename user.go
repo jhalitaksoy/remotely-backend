@@ -10,7 +10,6 @@ import (
 type User struct {
 	ID        int
 	Name      string
-	Password  string
 	Anonymous bool
 }
 
@@ -24,7 +23,7 @@ type UserRepository interface {
 	DeleteUser(ID int) bool
 }
 
-var userRepository UserRepository = &UserRepositoryMock{lastUserID: -1}
+//var userRepository UserRepository = &UserRepositoryMock{lastUserID: -1}
 
 //UserRepositoryMock is
 type UserRepositoryMock struct {
@@ -47,14 +46,14 @@ func (repo *UserRepositoryMock) RegisterUser(user *User) error {
 
 //LoginUser is
 func (repo *UserRepositoryMock) LoginUser(user *User) bool {
-	for _, eachUser := range repo.users {
+	/*for _, eachUser := range repo.users {
 		if eachUser.Name == user.Name {
 			if eachUser.Password == user.Password {
 				user.ID = eachUser.ID
 				return true
 			}
 		}
-	}
+	}*/
 	return false
 }
 

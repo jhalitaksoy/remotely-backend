@@ -18,6 +18,7 @@ require (
 	github.com/pion/rtp v1.6.1
 	github.com/pion/webrtc/v2 v2.2.26
 	github.com/ugorji/go v1.1.12 // indirect
+	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 )

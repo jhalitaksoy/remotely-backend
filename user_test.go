@@ -15,6 +15,7 @@ const (
 	appJSON = "application/json"
 )
 
+/*
 func TestRegisterUser(t *testing.T) {
 	userTemp := User{Name: "Alice", Password: "1234"}
 	userRepository.RegisterUser(&userTemp)
@@ -30,12 +31,12 @@ func TestRegisterUser(t *testing.T) {
 		t.Fatalf("Expected user id %d, got %d", 0, userTemp.ID)
 	}
 }
-
+*/
 func TestAddUserHttp(t *testing.T) {
-	ts := httptest.NewServer(startGin())
+	ts := httptest.NewServer(startGin(":4000"))
 	defer ts.Close()
 
-	user := User{Name: "Alice", Password: "1234"}
+	user := User{Name: "Alice" /*, Password: "1234"*/}
 	jsonUser, err := json.Marshal(user)
 	if err != nil {
 		t.Fatal(err)

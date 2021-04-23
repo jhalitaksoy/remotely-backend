@@ -127,7 +127,7 @@ func onChatMessage(room *Room, roomUser *RoomUser, data []byte) {
 
 //SendChatMessage is
 func SendChatMessage(room *Room, message *ChatMessage) {
-	user := userRepository.GetUserByID(message.User.ID)
+	user := myContext.UserStore.GeById(message.User.ID)
 	if user == nil {
 		log.Fatalf("User not found! id : %d", message.User.ID)
 		return

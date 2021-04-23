@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -12,38 +11,26 @@ import (
 	"github.com/pion/webrtc/v2"
 )
 
-func loginRoute(c *gin.Context) {
-	user := User{}
-	err := c.BindJSON(&user)
+func handleRegister(c *gin.Context) {
+	var registerParameters RegisterParameters
+	err := c.BindJSON(&registerParameters)
 	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.Status(http.StatusBadRequest)
 		return
 	}
-	ok := userRepository.LoginUser(&user)
-
-	if !ok {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-
-	c.String(http.StatusOK, fmt.Sprintf("%d", user.ID))
+	statusCode := myContext.AuthService.Register(&registerParameters)
+	c.Status(statusCode)
 }
 
-func registerRoute(c *gin.Context) {
-	user := User{}
-	err := c.BindJSON(&user)
+func handleLogin(c *gin.Context) {
+	var loginParameters LoginParameters
+	err := c.BindJSON(&loginParameters)
 	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.Status(http.StatusBadRequest)
 		return
 	}
-	err = userRepository.RegisterUser(&user)
-
-	if err != nil {
-		c.AbortWithStatus(http.StatusConflict)
-		return
-	}
-
-	c.String(http.StatusOK, fmt.Sprintf("%d", user.ID))
+	statusCode, userID := myContext.AuthService.Login(&loginParameters)
+	c.String(statusCode, userID)
 }
 
 func createRoomRoute(c *gin.Context) {
@@ -52,7 +39,7 @@ func createRoomRoute(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	user := userRepository.GetUserByID(userID)
+	user := myContext.UserStore.GeById(userID)
 
 	room := Room{}
 	err = c.BindJSON(&room)
@@ -77,7 +64,7 @@ func joinRoomRoute(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	user := userRepository.GetUserByID(userID)
+	user := myContext.UserStore.GeById(userID)
 
 	roomIDStr := c.Params.ByName("roomid")
 	roomID, err := strconv.Atoi(roomIDStr)
@@ -99,7 +86,7 @@ func listRoomsRoute(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	user := userRepository.GetUserByID(userID)
+	user := myContext.UserStore.GeById(userID)
 
 	rooms := roomRepository.ListRooms(user)
 	if rooms == nil {
@@ -163,13 +150,22 @@ func sdpRoute(c *gin.Context) {
 	var user *User
 
 	if err == nil {
-		user = userRepository.GetUserByID(userID)
+		user = myContext.UserStore.GeById(userID)
 		if user == nil {
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
 	} else {
-		user = userRepository.NewAnonymousUser()
+		_, err := myContext.UserStore.Create(&User{
+			Name:      "anonymous_user_" + createUUID(),
+			Anonymous: true,
+		})
+		if err != nil {
+			log.Printf("Error when creating anonymous user : %v", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
 	}
 
 	roomIDStr := c.Params.ByName("roomid")

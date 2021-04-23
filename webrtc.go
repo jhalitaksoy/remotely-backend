@@ -140,7 +140,7 @@ func ClearUser(room *Room, mediaRoom *MediaRoom, roomUser *RoomUser) {
 	mediaRoom.RemoveAudioTrackByUser(roomUser.User)
 	room.RemoveRoomUser(roomUser)
 	if roomUser.User.Anonymous {
-		userRepository.DeleteUser(roomUser.User.ID)
+		myContext.UserStore.Delete(roomUser.User.ID)
 	}
 }
 

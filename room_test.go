@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -12,18 +13,22 @@ import (
 )
 
 func TestRoom(t *testing.T) {
-	user1 := &User{Name: "Alice", Password: "1234"}
-	user2 := &User{Name: "Bob", Password: "1234"}
-	err := userRepository.RegisterUser(user1)
+	user1 := &User{Name: "Alice" /*, Password: "1234"*/}
+	user2 := &User{Name: "Bob" /*, Password: "1234"*/}
+
+	log.Println("Needs reimplement")
+	t.Fail()
+
+	/*err := userRepository.RegisterUser(user1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = userRepository.RegisterUser(user2)
 	if err != nil {
 		t.Fatal(err)
-	}
+	}*/
 
-	ts := httptest.NewServer(startGin())
+	ts := httptest.NewServer(startGin(":4000"))
 	defer ts.Close()
 
 	//Create Room
