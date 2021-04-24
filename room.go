@@ -11,11 +11,30 @@ import (
 type Room struct {
 	ID           int
 	Name         string
-	Owner        *User
+	OwnerID      int
 	Users        []*RoomUser
 	ChatMessages []*ChatMessage
 	Surveys      []*Survey
 	lastSurveyID int
+}
+
+type RoomDB struct {
+	TableName struct{} `sql:"rooms"`
+	ID        int
+	Name      string
+	OwnerID   int
+}
+
+func NewRoom(roomdb RoomDB) *Room {
+	return &Room{
+		ID:           roomdb.ID,
+		Name:         roomdb.Name,
+		OwnerID:      roomdb.OwnerID,
+		lastSurveyID: -1,
+		Users:        make([]*RoomUser, 0),
+		ChatMessages: []*ChatMessage{},
+		Surveys:      make([]*Survey, 0),
+	}
 }
 
 //CreateNewSurvey create new Survey from given survey
@@ -141,7 +160,7 @@ type RoomRepositoryMock struct {
 func (repo *RoomRepositoryMock) CreateRoom(user *User, room *Room) bool {
 	repo.lastRoomID = repo.lastRoomID + 1
 	room.ID = repo.lastRoomID
-	room.Owner = user
+	room.OwnerID = user.ID
 	room.lastSurveyID = 0
 	repo.JoinRoom(user, room)
 	repo.rooms = append(repo.rooms, room)

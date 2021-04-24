@@ -4,6 +4,8 @@ type MyContext struct {
 	AuthService   AuthService
 	UserStore     UserStore
 	PasswordStore PasswordStore
+	RoomStore     RoomStore
+	RoomProvider  RoomProvider
 }
 
 func newMyContextForTest() *MyContext {
@@ -12,10 +14,14 @@ func newMyContextForTest() *MyContext {
 	authService := newAuthServiceImpl()
 	authService.SetUserStore(userStore)
 	authService.SetPasswordStore(passwordStore)
+	roomStore := NewRoomStoreImpl()
+	roomProvider := NewRoomProviderImpl(roomStore)
 	return &MyContext{
 		UserStore:     userStore,
 		PasswordStore: passwordStore,
 		AuthService:   authService,
+		RoomStore:     roomStore,
+		RoomProvider:  roomProvider,
 	}
 }
 
@@ -27,9 +33,13 @@ func newMyContext() *MyContext {
 	authService := newAuthServiceImpl()
 	authService.SetUserStore(userStore)
 	authService.SetPasswordStore(passwordStore)
+	roomStore := NewRoomStoreDatabaseImpl(db)
+	roomProvider := NewRoomProviderImpl(roomStore)
 	return &MyContext{
 		UserStore:     userStore,
 		PasswordStore: passwordStore,
 		AuthService:   authService,
+		RoomStore:     roomStore,
+		RoomProvider:  roomProvider,
 	}
 }
