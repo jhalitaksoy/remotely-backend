@@ -80,14 +80,6 @@ func (room *Room) JoinUserToRoom(user *User, sd webrtc.SessionDescription, isPub
 	return mediaRoom.JoinUser(context, sd)
 }
 
-//RoomRepository is
-type RoomRepository interface {
-	GetRoomByID(ID int) *Room
-	CreateRoom(*User, *Room) bool
-	JoinRoom(*User, *Room) bool
-	ListRooms(*User) []*Room
-}
-
 func (room *Room) addRoomUser(newRoomUser *RoomUser) {
 	for i, eachRoomUser := range room.Users {
 		if eachRoomUser.User.ID == newRoomUser.User.ID {
@@ -147,7 +139,15 @@ func removeRoomUserByIndex(s []*RoomUser, i int) []*RoomUser {
 	return s[:len(s)-1]
 }
 
-var roomRepository RoomRepository = &RoomRepositoryMock{lastRoomID: -1, userRoomsTable: make(map[*User][]*Room)}
+//RoomRepository is
+type RoomRepository interface {
+	GetRoomByID(ID int) *Room
+	CreateRoom(*User, *Room) bool
+	JoinRoom(*User, *Room) bool
+	ListRooms(*User) []*Room
+}
+
+//var roomRepository RoomRepository = &RoomRepositoryMock{lastRoomID: -1, userRoomsTable: make(map[*User][]*Room)}
 
 // RoomRepositoryMock is
 type RoomRepositoryMock struct {

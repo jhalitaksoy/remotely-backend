@@ -37,3 +37,39 @@ func TestRoomStoreDB(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestRoomStoreDBListRoomsByUser(t *testing.T) {
+	LoadEnviromentVariables()
+	myContext := newMyContext()
+	userId := 2
+	_, err := myContext.RoomStore.Create(RoomDB{
+		Name:    "TestRoom1",
+		OwnerID: userId,
+	})
+
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+
+	_, err = myContext.RoomStore.Create(RoomDB{
+		Name:    "TestRoom2",
+		OwnerID: 2,
+	})
+
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+
+	rooms, err := myContext.RoomStore.GetByUserID(userId)
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+
+	if len(rooms) != 2 {
+		log.Println("Rooms lenght is not match")
+		t.Fail()
+	}
+}

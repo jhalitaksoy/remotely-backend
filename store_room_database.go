@@ -31,6 +31,12 @@ func (roomStore *RoomStoreDatabaseImpl) GetByName(name string) ([]*RoomDB, error
 	return roomDBs, err
 }
 
+func (roomStore *RoomStoreDatabaseImpl) GetByUserID(userID int) ([]*RoomDB, error) {
+	roomDBs := make([]*RoomDB, 0)
+	err := roomStore.Database.DB.Model(&roomDBs).Where("owner_id = ?", userID).Select()
+	return roomDBs, err
+}
+
 func (roomStore *RoomStoreDatabaseImpl) Update(room *RoomDB) error {
 	roomDB := new(RoomDB)
 	_, err := roomStore.Database.DB.Model(roomDB).Update()

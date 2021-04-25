@@ -96,8 +96,13 @@ func startGin(port string) *gin.Engine {
 		room := r.Group("/room")
 		{
 			room.POST("/create", createRoomRoute)
-			room.POST("/join/:roomid", joinRoomRoute)
+			//room.POST("/join/:roomid", joinRoomRoute)
 			room.POST("/listRooms", listRoomsRoute)
+		}
+
+		stream := r.Group("/stream_private")
+		{
+			stream.POST("/sdp/:roomid", sdpRoute)
 		}
 	}
 

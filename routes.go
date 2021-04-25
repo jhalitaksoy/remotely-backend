@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg"
 	"github.com/pion/webrtc/v2"
 )
 
@@ -34,23 +35,31 @@ func handleLogin(c *gin.Context) {
 }
 
 func createRoomRoute(c *gin.Context) {
-	userID, err := strconv.Atoi(c.GetHeader("userID"))
-	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	user := myContext.UserStore.GeById(userID)
-
-	room := Room{}
-	err = c.BindJSON(&room)
-	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+	_jwtClaims, exists := c.Get(jwtClaimsKeyName)
+	if !exists {
+		log.Println("Jwt Claims not found")
 		return
 	}
 
-	ok := roomRepository.CreateRoom(user, &room)
-
+	jwtClaims, ok := _jwtClaims.(*jwtClaims)
 	if !ok {
+		log.Println("Jwt Claims is not jwtClaims")
+		return
+	}
+
+	room := RoomDB{}
+	err := c.BindJSON(&room)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	room.OwnerID = jwtClaims.UserID
+
+	_, err = myContext.RoomStore.Create(room)
+
+	if err != nil {
+		log.Println(err)
 		c.AbortWithStatus(http.StatusConflict)
 		return
 	}
@@ -58,79 +67,122 @@ func createRoomRoute(c *gin.Context) {
 	c.AbortWithStatus(http.StatusOK)
 }
 
+/*
 func joinRoomRoute(c *gin.Context) {
-	userID, err := strconv.Atoi(c.GetHeader("userID"))
-	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+
+	_jwtClaims, exists := c.Get(jwtClaimsKeyName)
+	if !exists {
+		log.Println("Jwt Claims not found")
 		return
 	}
-	user := myContext.UserStore.GeById(userID)
+
+	jwtClaims, ok := _jwtClaims.(jwtClaims)
+	if !ok {
+		log.Println("Jwt Claims is not jwtClaims")
+		return
+	}
 
 	roomIDStr := c.Params.ByName("roomid")
 	roomID, err := strconv.Atoi(roomIDStr)
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 	}
-	room := roomRepository.GetRoomByID(roomID)
+	room, err := myContext.RoomStore.GetByID(roomID)
 	ok := roomRepository.JoinRoom(user, room)
 	if !ok {
 		c.AbortWithStatus(http.StatusConflict)
 		return
 	}
 	c.AbortWithStatus(http.StatusOK)
-}
+}*/
 
 func listRoomsRoute(c *gin.Context) {
-	userID, err := strconv.Atoi(c.GetHeader("userID"))
-	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+
+	_jwtClaims, exists := c.Get(jwtClaimsKeyName)
+	if !exists {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		log.Println("Jwt Claims not found")
 		return
 	}
-	user := myContext.UserStore.GeById(userID)
 
-	rooms := roomRepository.ListRooms(user)
-	if rooms == nil {
+	jwtClaims, ok := _jwtClaims.(*jwtClaims)
+	if !ok {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		log.Println("Jwt Claims is not jwtClaims")
+		return
+	}
+
+	rooms, err := myContext.RoomStore.GetByUserID(jwtClaims.UserID)
+	if err == pg.ErrNoRows {
+		rooms = make([]*RoomDB, 0)
+	} else if err != nil {
 		c.AbortWithStatus(http.StatusConflict)
 		return
 	}
+
 	c.JSON(http.StatusOK, rooms)
 }
 
 func chatRoomRoute(c *gin.Context) {
 	//Security issue !!!!!!!!!!!!!!
 
-	//userID, err := strconv.Atoi(c.GetHeader("userID"))
-	//if err != nil {
-	//	c.AbortWithStatus(http.StatusBadRequest)
-	//	return
-	//}
-	//user := userRepository.GetUserByID(userID)
+	/*_jwtClaims, exists := c.Get(jwtClaimsKeyName)
+	if !exists {
+		log.Println("Jwt Claims not found")
+		return
+	}
+
+	jwtClaims, ok := _jwtClaims.(jwtClaims)
+	if !ok {
+		log.Println("Jwt Claims is not jwtClaims")
+		return
+	}*/
 
 	roomIDStr := c.Params.ByName("roomid")
 	roomID, err := strconv.Atoi(roomIDStr)
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 	}
-	room := roomRepository.GetRoomByID(roomID)
+
+	room, err := myContext.RoomProvider.GetFromCache(roomID)
+	if err == pg.ErrNoRows {
+		c.Status(http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
 	c.JSON(http.StatusOK, room.ChatMessages)
 }
 
 func getRoomRoute(c *gin.Context) {
-	//userID, err := strconv.Atoi(c.GetHeader("userID"))
-	//if err != nil {
-	//	c.AbortWithStatus(http.StatusBadRequest)
-	//	return
-	//}
-	//user := userRepository.GetUserByID(userID)
+
+	/*_jwtClaims, exists := c.Get(jwtClaimsKeyName)
+	if !exists {
+		log.Println("Jwt Claims not found")
+		return
+	}
+
+	jwtClaims, ok := _jwtClaims.(jwtClaims)
+	if !ok {
+		log.Println("Jwt Claims is not jwtClaims")
+		return
+	}*/
 
 	roomIDStr := c.Params.ByName("roomid")
 	roomID, err := strconv.Atoi(roomIDStr)
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 	}
-	room := roomRepository.GetRoomByID(roomID)
-	if room == nil {
-		c.AbortWithStatus(http.StatusConflict)
+	room, err := myContext.RoomStore.GetByID(roomID)
+	if err == pg.ErrNoRows {
+		c.Status(http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 	c.JSON(http.StatusOK, room)
@@ -142,21 +194,26 @@ type message struct {
 }
 
 func sdpRoute(c *gin.Context) {
-	userID, err := strconv.Atoi(c.GetHeader("userID"))
-	/*if err != nil {
-		//c.AbortWithStatus(http.StatusBadRequest)
-		//return
-	}*/
+	userID := -1
+
+	_jwtClaims, exists := c.Get(jwtClaimsKeyName)
+	if exists {
+		jwtClaims, ok := _jwtClaims.(*jwtClaims)
+		if ok {
+			userID = jwtClaims.UserID
+		}
+	}
+
 	var user *User
 
-	if err == nil {
+	if userID >= 0 {
 		user = myContext.UserStore.GeById(userID)
 		if user == nil {
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
 	} else {
-		_, err := myContext.UserStore.Create(&User{
+		userID, err := myContext.UserStore.Create(&User{
 			Name:      "anonymous_user_" + createUUID(),
 			Anonymous: true,
 		})
@@ -165,6 +222,8 @@ func sdpRoute(c *gin.Context) {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
+
+		user = myContext.UserStore.GeById(userID)
 
 	}
 
@@ -175,9 +234,13 @@ func sdpRoute(c *gin.Context) {
 		return
 	}
 
-	room := roomRepository.GetRoomByID(roomID)
-	if room == nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+	room, err := myContext.RoomProvider.GetFromCache(roomID)
+	if err == pg.ErrNoRows {
+		c.Status(http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
@@ -219,9 +282,13 @@ func listUsers(c *gin.Context) {
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 	}
-	room := roomRepository.GetRoomByID(roomID)
-	if room == nil {
-		c.AbortWithStatus(http.StatusNotFound)
+	room, err := myContext.RoomProvider.GetFromCache(roomID)
+	if err == pg.ErrNoRows {
+		c.Status(http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 

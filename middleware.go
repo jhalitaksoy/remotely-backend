@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"strconv"
 
 	"strings"
 
@@ -11,22 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func authRequired(c *gin.Context) {
-	userID, err := strconv.Atoi(c.GetHeader("userID"))
-	if err != nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
-		log.Print("User ID not found in header!")
-		return
-	}
-	user := myContext.UserStore.GeById(userID)
-	if user == nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
-		log.Print("User Not Found By ID!")
-		return
-	}
-
-	c.Set("user", user)
-}
+const jwtClaimsKeyName = "jwtClaims"
 
 func requiredAuthentication(context *gin.Context) {
 	header := context.Request.Header.Get("Authorization")
@@ -62,7 +46,7 @@ func requiredAuthentication(context *gin.Context) {
 		return
 	}
 
-	context.Set("claims", claims)
+	context.Set(jwtClaimsKeyName, claims)
 
 	user := myContext.UserStore.GeById(claims.UserID)
 	if user == nil {

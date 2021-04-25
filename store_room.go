@@ -6,6 +6,7 @@ type RoomStore interface {
 	Create(RoomDB) (*RoomDB, error)
 	GetByID(int) (*RoomDB, error)
 	GetByName(string) ([]*RoomDB, error)
+	GetByUserID(int) ([]*RoomDB, error)
 	Update(*RoomDB) error
 	Delete(int) error
 	SetOnRoomChangeListener(event OnRoomChangeEvent)
@@ -39,6 +40,16 @@ func (roomStore *RoomStoreImpl) GetByName(name string) ([]*RoomDB, error) {
 	rooms := make([]*RoomDB, 0)
 	for _, room := range roomStore.Rooms {
 		if room.Name == name {
+			rooms = append(rooms, room)
+		}
+	}
+	return rooms, nil
+}
+
+func (roomStore *RoomStoreImpl) GetByUserID(userID int) ([]*RoomDB, error) {
+	rooms := make([]*RoomDB, 0)
+	for _, room := range roomStore.Rooms {
+		if room.OwnerID == userID {
 			rooms = append(rooms, room)
 		}
 	}
