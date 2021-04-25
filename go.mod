@@ -7,19 +7,22 @@ require (
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-pg/pg v8.0.7+incompatible
-	github.com/go-pg/pg/v10 v10.9.0 // indirect
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
-	github.com/golang/protobuf v1.4.3 // indirect
+	github.com/google/go-cmp v0.5.5 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/joho/godotenv v1.3.0
 	github.com/json-iterator/go v1.1.10 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
-	github.com/pion/rtcp v1.2.4
-	github.com/pion/rtp v1.6.1
-	github.com/pion/webrtc/v2 v2.2.26
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	
+	github.com/pion/rtcp v1.2.6
+	
+	github.com/pion/webrtc/v3 v3.0.25
 	github.com/ugorji/go v1.1.12 // indirect
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
-	golang.org/x/tools v0.0.0-20190524140312-2c0ae7006135
+	
 	google.golang.org/protobuf v1.25.0 // indirect
-	gopkg.in/yaml.v2 v2.3.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
+	mellium.im/sasl v0.2.1 // indirect
 )

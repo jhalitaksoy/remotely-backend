@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log"
 
-	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v3"
 )
 
 //Room is
@@ -90,9 +90,11 @@ func (room *Room) onPeerConnectionChange(context *Context, myContext *MyContext,
 	case webrtc.PeerConnectionStateConnecting:
 	case webrtc.PeerConnectionStateConnected:
 	case webrtc.PeerConnectionStateFailed:
-		myContext.RoomProviderGC.OnUserConnectionClose(context)
+		//todo look later
+		//myContext.RoomProviderGC.OnUserConnectionClose(context)
 	case webrtc.PeerConnectionStateClosed:
-		myContext.RoomProviderGC.OnUserConnectionClose(context)
+		//todo look later
+		//myContext.RoomProviderGC.OnUserConnectionClose(context)
 	case webrtc.PeerConnectionStateDisconnected:
 		myContext.RoomProviderGC.OnUserConnectionClose(context)
 	}

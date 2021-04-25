@@ -17,7 +17,7 @@ type UserConnectionCout struct {
 }
 
 func (userConnectionCount *UserConnectionCout) MustRemove() bool {
-	return userConnectionCount.OpenCount <= userConnectionCount.CloseCount
+	return userConnectionCount.OpenCount == userConnectionCount.CloseCount
 }
 
 func NewUserConnectionCout() *UserConnectionCout {

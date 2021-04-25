@@ -5,10 +5,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/pion/rtp/codecs"
-	"github.com/pion/webrtc/v2"
-	"github.com/pion/webrtc/v2/pkg/media"
-	"github.com/pion/webrtc/v2/pkg/media/samplebuilder"
+	"github.com/pion/webrtc/v3"
 )
 
 //MediaRoom is
@@ -16,7 +13,7 @@ type MediaRoom struct {
 	RoomID          int
 	API             *webrtc.API
 	UserAudioTracks [MaxUserSize]*UserAudioTrack
-	VideoTrack      *webrtc.Track
+	VideoTrack      *webrtc.TrackLocalStaticRTP
 }
 
 //NewMediaRoom is
@@ -135,7 +132,7 @@ func (mediaRoom *MediaRoom) JoinUser(
 
 func (mediaRoom *MediaRoom) allowSendAudioTrackToAllPeers(context *Context) {
 	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
-		if userAudioTrack.IsSameUser(context.User) {
+		if !userAudioTrack.IsSameUser(context.User) {
 			AllowSendAudioTrack(context.RoomUser.PeerConnection, userAudioTrack.Track)
 		}
 	}
@@ -144,23 +141,21 @@ func (mediaRoom *MediaRoom) allowSendAudioTrackToAllPeers(context *Context) {
 func (mediaRoom *MediaRoom) addOnTrack(roomUser *RoomUser) {
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
-	roomUser.PeerConnection.OnTrack(func(remoteTrack *webrtc.Track, receiver *webrtc.RTPReceiver) {
+	roomUser.PeerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		log.Println("Track acquired", remoteTrack.Kind(), remoteTrack.Codec())
 
 		mediaRoom.onTrack(roomUser, remoteTrack, receiver)
 	})
 }
 
-func (mediaRoom *MediaRoom) onTrack(roomUser *RoomUser, remoteTrack *webrtc.Track, receiver *webrtc.RTPReceiver) {
+func (mediaRoom *MediaRoom) onTrack(roomUser *RoomUser, remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 	// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 	// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
 	sendPLIInterval(roomUser.PeerConnection, remoteTrack)
 
-	builderVideo := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.VP8Packet{})
-	builderAudio := samplebuilder.New(rtpAverageFrameWidth*5, &codecs.OpusPacket{})
-
+	rtpBuf := make([]byte, 1400)
 	for {
-		rtp, err := remoteTrack.ReadRTP()
+		i, _, err := remoteTrack.Read(rtpBuf)
 		if err != nil {
 			if err == io.EOF {
 				return
@@ -178,29 +173,16 @@ func (mediaRoom *MediaRoom) onTrack(roomUser *RoomUser, remoteTrack *webrtc.Trac
 			log.Println("Audio track was nil!")
 			break
 		}
+
 		if remoteTrack.Kind() == webrtc.RTPCodecTypeAudio {
-			builderAudio.Push(rtp)
-			for s := builderAudio.Pop(); s != nil; s = builderAudio.Pop() {
-				mediaRoom.onAudioSample(roomUser, audioTrack, s)
+			if _, err := audioTrack.Write(rtpBuf[:i]); err != nil && err != io.ErrClosedPipe {
+				log.Panic(err)
 			}
 		} else if remoteTrack.Kind() == webrtc.RTPCodecTypeVideo {
-			builderVideo.Push(rtp)
-			for s := builderVideo.Pop(); s != nil; s = builderVideo.Pop() {
-				mediaRoom.onVideoSample(roomUser, s)
+			if _, err := mediaRoom.VideoTrack.Write(rtpBuf[:i]); err != nil && err != io.ErrClosedPipe {
+				log.Panic(err)
 			}
 		}
-	}
-}
-
-func (mediaRoom *MediaRoom) onAudioSample(roomUser *RoomUser, track *webrtc.Track, sample *media.Sample) {
-	if err := track.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
-		log.Panic(err)
-	}
-}
-
-func (mediaRoom *MediaRoom) onVideoSample(roomUser *RoomUser, sample *media.Sample) {
-	if err := mediaRoom.VideoTrack.WriteSample(*sample); err != nil && err != io.ErrClosedPipe {
-		log.Panic(err)
 	}
 }
 
