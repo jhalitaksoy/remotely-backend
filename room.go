@@ -13,6 +13,7 @@ type Room struct {
 	Name         string
 	OwnerID      int
 	Users        []*RoomUser
+	MediaRoom    *MediaRoom
 	ChatMessages []*ChatMessage
 	Surveys      []*Survey
 	lastSurveyID int
@@ -30,10 +31,11 @@ func NewRoom(roomdb RoomDB) *Room {
 		ID:           roomdb.ID,
 		Name:         roomdb.Name,
 		OwnerID:      roomdb.OwnerID,
-		lastSurveyID: -1,
 		Users:        make([]*RoomUser, 0),
+		MediaRoom:    NewMediaRoom(roomdb.ID),
 		ChatMessages: []*ChatMessage{},
 		Surveys:      make([]*Survey, 0),
+		lastSurveyID: -1,
 	}
 }
 
@@ -61,7 +63,7 @@ func (room *Room) VoteSurvey(id int, user *User) {
 }
 
 func (room *Room) JoinUserToRoom(user *User, sd webrtc.SessionDescription, isPublisher bool) (*webrtc.SessionDescription, error) {
-	mediaRoom := mediaRoomRepository.GetMediaRoomByRoomID(room.ID)
+	mediaRoom := room.MediaRoom
 	if mediaRoom == nil {
 		return nil, errors.New("media room not found")
 	}
