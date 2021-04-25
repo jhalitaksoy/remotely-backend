@@ -58,7 +58,7 @@ func (userStore *UserStoreImpl) Update(user *User) {
 }
 
 func (userStore *UserStoreImpl) Delete(id int) {
-	userStore.Users[id] = nil
+	delete(userStore.Users, id)
 }
 
 func (userStore *UserStoreImpl) createNewUserId() int {

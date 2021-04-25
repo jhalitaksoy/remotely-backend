@@ -45,7 +45,7 @@ func (roomProvider *RoomProviderImpl) GetFromCache(roomID int) (*Room, error) {
 }
 
 func (roomProvider *RoomProviderImpl) RemoveFromCache(roomID int) {
-	roomProvider.Rooms[roomID] = nil
+	delete(roomProvider.Rooms, roomID)
 }
 
 func (roomProvider *RoomProviderImpl) StoreRoomInCache(roomID int) (*Room, error) {

@@ -42,5 +42,5 @@ func (passwordStore *PasswordStoreImpl) Update(userID int, hash string) {
 }
 
 func (passwordStore *PasswordStoreImpl) Delete(userID int) {
-	passwordStore.Passwords[userID] = nil
+	delete(passwordStore.Passwords, userID)
 }

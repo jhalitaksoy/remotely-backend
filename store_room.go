@@ -63,7 +63,7 @@ func (roomStore *RoomStoreImpl) Update(room *RoomDB) error {
 }
 
 func (roomStore *RoomStoreImpl) Delete(id int) error {
-	roomStore.Rooms[id] = nil
+	delete(roomStore.Rooms, id)
 	roomStore.fireOnRoomChange(id)
 	return nil
 }

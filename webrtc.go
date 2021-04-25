@@ -118,32 +118,6 @@ func AllowSendVideoTrack(pc *webrtc.PeerConnection, videoTrack *webrtc.Track) {
 	}
 }
 
-func OnPeerConnectionChange(context *Context, pcs webrtc.PeerConnectionState) {
-	room := context.Room
-	mediaRoom := context.MediaRoom
-	roomUser := context.RoomUser
-	switch pcs {
-	case webrtc.PeerConnectionStateNew:
-	case webrtc.PeerConnectionStateConnecting:
-	case webrtc.PeerConnectionStateConnected:
-	case webrtc.PeerConnectionStateFailed:
-		ClearUser(room, mediaRoom, roomUser)
-	case webrtc.PeerConnectionStateClosed:
-		ClearUser(room, mediaRoom, roomUser)
-	case webrtc.PeerConnectionStateDisconnected:
-		ClearUser(room, mediaRoom, roomUser)
-	}
-}
-
-func ClearUser(room *Room, mediaRoom *MediaRoom, roomUser *RoomUser) {
-	log.Println("ClearUser()")
-	mediaRoom.RemoveAudioTrackByUser(roomUser.User)
-	room.RemoveRoomUser(roomUser)
-	if roomUser.User.Anonymous {
-		myContext.UserStore.Delete(roomUser.User.ID)
-	}
-}
-
 func sendPLIInterval(pc *webrtc.PeerConnection, remoteTrack *webrtc.Track) {
 	// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 	// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it

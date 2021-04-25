@@ -262,7 +262,7 @@ func sdpRoute(c *gin.Context) {
 		return
 	}
 
-	answer, err := room.JoinUserToRoom(user, offer.SD, isPublisher)
+	answer, err := room.JoinUserToRoom(myContext, user, offer.SD, isPublisher)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -275,6 +275,8 @@ func sdpRoute(c *gin.Context) {
 	})
 }
 
+// Only Test Remove Later
+
 func listUsers(c *gin.Context) {
 
 	roomIDStr := c.Params.ByName("roomid")
@@ -282,6 +284,7 @@ func listUsers(c *gin.Context) {
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 	}
+	//calling GetFromCache is problem !!!
 	room, err := myContext.RoomProvider.GetFromCache(roomID)
 	if err == pg.ErrNoRows {
 		c.Status(http.StatusNotFound)
@@ -299,3 +302,15 @@ func listUsers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, userNames)
 }
+
+func listRoomCache(c *gin.Context) {
+	//only test
+	userNames := []string{}
+	for _, room := range myContext.RoomProvider.(*RoomProviderImpl).Rooms {
+		userNames = append(userNames, room.Name)
+	}
+
+	c.JSON(http.StatusOK, userNames)
+}
+
+// Only Test Remove Later

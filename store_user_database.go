@@ -64,16 +64,17 @@ func (userStore *UserStoreDBImpl) Update(user *User) {
 	_, err := userStore.DataBase.DB.Model(user).Where("id = ?", user.ID).Update()
 
 	if err != nil {
-		log.Printf("An error occured when selecting users")
+		log.Printf("An error occured when updating user %v", err)
 	}
 	//todo : handle error (return)
 }
 
 func (userStore *UserStoreDBImpl) Delete(id int) {
-	_, err := userStore.DataBase.DB.Model().Where("id = ?", id).Delete()
+	user := new(User)
+	_, err := userStore.DataBase.DB.Model(user).Where("id = ?", id).Delete()
 
 	if err != nil {
-		log.Printf("An error occured when selecting users")
+		log.Printf("An error occured when deleting user %v", err)
 	}
 	//todo : handle error (return)
 }

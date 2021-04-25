@@ -82,6 +82,7 @@ func startGin(port string) *gin.Engine {
 	test := r.Group("/test")
 	{
 		test.GET("/users/:roomid", listUsers)
+		test.GET("/listRoomCache", listRoomCache)
 	}
 
 	room := r.Group("/room")

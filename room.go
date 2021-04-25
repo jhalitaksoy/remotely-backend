@@ -62,7 +62,7 @@ func (room *Room) VoteSurvey(id int, user *User) {
 
 }
 
-func (room *Room) JoinUserToRoom(user *User, sd webrtc.SessionDescription, isPublisher bool) (*webrtc.SessionDescription, error) {
+func (room *Room) JoinUserToRoom(myContext *MyContext, user *User, sd webrtc.SessionDescription, isPublisher bool) (*webrtc.SessionDescription, error) {
 	mediaRoom := room.MediaRoom
 	if mediaRoom == nil {
 		return nil, errors.New("media room not found")
@@ -74,12 +74,28 @@ func (room *Room) JoinUserToRoom(user *User, sd webrtc.SessionDescription, isPub
 
 	context := NewContext(room, mediaRoom, roomUser, isPublisher)
 
+	myContext.RoomProviderGC.OnUserConnectionOpen(context)
+
 	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
 		log.Println(pcs.String())
-		OnPeerConnectionChange(context, pcs)
+		room.onPeerConnectionChange(context, myContext, pcs)
 	})
 
 	return mediaRoom.JoinUser(context, sd)
+}
+
+func (room *Room) onPeerConnectionChange(context *Context, myContext *MyContext, pcs webrtc.PeerConnectionState) {
+	switch pcs {
+	case webrtc.PeerConnectionStateNew:
+	case webrtc.PeerConnectionStateConnecting:
+	case webrtc.PeerConnectionStateConnected:
+	case webrtc.PeerConnectionStateFailed:
+		myContext.RoomProviderGC.OnUserConnectionClose(context)
+	case webrtc.PeerConnectionStateClosed:
+		myContext.RoomProviderGC.OnUserConnectionClose(context)
+	case webrtc.PeerConnectionStateDisconnected:
+		myContext.RoomProviderGC.OnUserConnectionClose(context)
+	}
 }
 
 func (room *Room) addRoomUser(newRoomUser *RoomUser) {
@@ -127,6 +143,7 @@ func (room *Room) getSurveyByID(id int) *Survey {
 }
 
 func (room *Room) RemoveRoomUser(roomUser *RoomUser) bool {
+	room.MediaRoom.RemoveAudioTrackByUser(roomUser.User)
 	for i, eachRoomUser := range room.Users {
 		if eachRoomUser.User.ID == roomUser.User.ID {
 			room.Users = removeRoomUserByIndex(room.Users, i)
@@ -134,6 +151,9 @@ func (room *Room) RemoveRoomUser(roomUser *RoomUser) bool {
 		}
 	}
 	return false
+}
+func (room *Room) MustRemove() bool {
+	return len(room.Users) == 0
 }
 
 func removeRoomUserByIndex(s []*RoomUser, i int) []*RoomUser {
