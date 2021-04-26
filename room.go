@@ -69,6 +69,7 @@ func (room *Room) JoinUserToRoom(myContext *MyContext, user *User, sd webrtc.Ses
 	}
 
 	pc := mediaRoom.NewPeerConnection()
+
 	roomUser := NewRoomUser(user, pc)
 	room.addRoomUser(roomUser)
 

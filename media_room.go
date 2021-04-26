@@ -12,7 +12,7 @@ import (
 type MediaRoom struct {
 	RoomID          int
 	API             *webrtc.API
-	UserAudioTracks [MaxUserSize]*UserAudioTrack
+	UserAudioTracks map[int]*webrtc.TrackLocalStaticRTP
 	VideoTrack      *webrtc.TrackLocalStaticRTP
 }
 
@@ -21,13 +21,13 @@ func NewMediaRoom(id int) *MediaRoom {
 	mediaEngine := NewMediaEngine()
 	api := NewAPI(mediaEngine)
 
-	userAudioTracks := CreateUserAudioTracks()
+	//userAudioTracks := CreateUserAudioTracks()
 	videoTrack := NewVideoTrack()
 
 	return &MediaRoom{
 		RoomID:          id,
 		API:             api,
-		UserAudioTracks: userAudioTracks,
+		UserAudioTracks: make(map[int]*webrtc.TrackLocalStaticRTP),
 		VideoTrack:      videoTrack,
 	}
 }
@@ -37,44 +37,25 @@ func (mediaRoom *MediaRoom) NewPeerConnection() *webrtc.PeerConnection {
 	return NewPeerConnection(mediaRoom.API)
 }
 
-func (mediaRoom *MediaRoom) findSuitableAudioTrack(user *User) *UserAudioTrack {
-	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
-		if userAudioTrack.User != nil {
-			if userAudioTrack.User.ID == user.ID {
-				log.Println("Used old audiotrack")
-				userAudioTrack.User = user
-				return userAudioTrack
-			}
-		} else {
-			log.Println("Used new audio track")
-			userAudioTrack.User = user
-			return userAudioTrack
-		}
+func (mediaRoom *MediaRoom) findSuitableAudioTrack(user *User) *webrtc.TrackLocalStaticRTP {
+	audioTrack, ok := mediaRoom.UserAudioTracks[user.ID]
+	if ok {
+		log.Println("Founded old audio track")
+		return audioTrack
+	} else {
+		audioTrack = NewAudioTrack()
+		mediaRoom.UserAudioTracks[user.ID] = audioTrack
 	}
-	return nil
+	return audioTrack
 }
 
-func (mediaRoom *MediaRoom) findAudioTrackByUser(user *User) *UserAudioTrack {
-	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
-		if userAudioTrack.User == nil {
-			continue
-		}
-		if userAudioTrack.User.ID == user.ID {
-			return userAudioTrack
-		}
-	}
-	return nil
+func (mediaRoom *MediaRoom) findAudioTrackByUser(user *User) *webrtc.TrackLocalStaticRTP {
+	audioTrack := mediaRoom.UserAudioTracks[user.ID]
+	return audioTrack
 }
 
 func (mediaRoom *MediaRoom) RemoveAudioTrackByUser(user *User) {
-	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
-		if userAudioTrack.User == nil {
-			continue
-		}
-		if userAudioTrack.User.ID == user.ID {
-			userAudioTrack.User = nil
-		}
-	}
+	delete(mediaRoom.UserAudioTracks, user.ID)
 }
 
 //JoinUser is
@@ -92,6 +73,8 @@ func (mediaRoom *MediaRoom) JoinUser(
 
 	mediaRoom.allowSendAudioTrackToAllPeers(context)
 
+	mediaRoom.allowSendAudioTrackToAllPeers2(context, userAudioTrack)
+
 	AllowReceiveAudioTrack(pc)
 
 	if context.IsPublisher {
@@ -108,6 +91,10 @@ func (mediaRoom *MediaRoom) JoinUser(
 	log.Printf("Added RoomUser id : %d. RoomUser Count : %d", context.User.ID, len(context.Room.Users))
 
 	DataChannelHandler(context)
+
+	pc.OnNegotiationNeeded(func() {
+		log.Println("OnNegotiationNeeded")
+	})
 
 	// Set the remote SessionDescription
 	err := pc.SetRemoteDescription(sd)
@@ -131,9 +118,17 @@ func (mediaRoom *MediaRoom) JoinUser(
 }
 
 func (mediaRoom *MediaRoom) allowSendAudioTrackToAllPeers(context *Context) {
-	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
-		if !userAudioTrack.IsSameUser(context.User) {
-			AllowSendAudioTrack(context.RoomUser.PeerConnection, userAudioTrack.Track)
+	for userID, userAudioTrack := range mediaRoom.UserAudioTracks {
+		if context.User.ID != userID {
+			AllowSendAudioTrack(context.RoomUser.PeerConnection, userAudioTrack)
+		}
+	}
+}
+
+func (mediaRoom *MediaRoom) allowSendAudioTrackToAllPeers2(context *Context, remoteAudioTrack *webrtc.TrackLocalStaticRTP) {
+	for _, roomUser := range context.Room.Users {
+		if roomUser.User.ID != context.User.ID {
+			AllowSendAudioTrack(roomUser.PeerConnection, remoteAudioTrack)
 		}
 	}
 }
@@ -153,6 +148,8 @@ func (mediaRoom *MediaRoom) onTrack(roomUser *RoomUser, remoteTrack *webrtc.Trac
 	// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
 	sendPLIInterval(roomUser.PeerConnection, remoteTrack)
 
+	log.Printf("Sending New Track %s", remoteTrack.Kind())
+
 	rtpBuf := make([]byte, 1400)
 	for {
 		i, _, err := remoteTrack.Read(rtpBuf)
@@ -168,7 +165,8 @@ func (mediaRoom *MediaRoom) onTrack(roomUser *RoomUser, remoteTrack *webrtc.Trac
 			break
 		}
 
-		audioTrack := userAudioTrack.Track
+		audioTrack := userAudioTrack
+
 		if audioTrack == nil {
 			log.Println("Audio track was nil!")
 			break
