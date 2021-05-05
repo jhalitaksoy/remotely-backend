@@ -12,7 +12,7 @@ type Room struct {
 	ID           int
 	Name         string
 	OwnerID      int
-	Users        []*RoomUser
+	Users        []*Peer
 	MediaRoom    *MediaRoom
 	ChatMessages []*ChatMessage
 	Surveys      []*Survey
@@ -31,7 +31,7 @@ func NewRoom(roomdb RoomDB) *Room {
 		ID:           roomdb.ID,
 		Name:         roomdb.Name,
 		OwnerID:      roomdb.OwnerID,
-		Users:        make([]*RoomUser, 0),
+		Users:        make([]*Peer, 0),
 		MediaRoom:    NewMediaRoom(roomdb.ID),
 		ChatMessages: []*ChatMessage{},
 		Surveys:      make([]*Survey, 0),
@@ -69,22 +69,22 @@ func (room *Room) JoinUserToRoom(myContext *MyContext, user *User, sd webrtc.Ses
 	}
 
 	pc := mediaRoom.NewPeerConnection()
-	roomUser := NewRoomUser(user, pc)
-	room.addRoomUser(roomUser)
+	peer := NewPeer(user, pc, room, isPublisher)
+	room.addPeer(peer)
 
-	context := NewContext(room, mediaRoom, roomUser, isPublisher)
-
-	myContext.RoomProviderGC.OnUserConnectionOpen(context)
+	myContext.RoomProviderGC.OnUserConnectionOpen(peer)
 
 	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
 		log.Println(pcs.String())
-		room.onPeerConnectionChange(context, myContext, pcs)
+		room.onPeerConnectionChange(peer, myContext, pcs)
 	})
 
-	return mediaRoom.JoinUser(context, sd)
+	ListenMessages(myContext, peer)
+
+	return mediaRoom.JoinUser(peer, sd)
 }
 
-func (room *Room) onPeerConnectionChange(context *Context, myContext *MyContext, pcs webrtc.PeerConnectionState) {
+func (room *Room) onPeerConnectionChange(peer *Peer, myContext *MyContext, pcs webrtc.PeerConnectionState) {
 	switch pcs {
 	case webrtc.PeerConnectionStateNew:
 	case webrtc.PeerConnectionStateConnecting:
@@ -96,13 +96,13 @@ func (room *Room) onPeerConnectionChange(context *Context, myContext *MyContext,
 		//todo look later
 		//myContext.RoomProviderGC.OnUserConnectionClose(context)
 	case webrtc.PeerConnectionStateDisconnected:
-		myContext.RoomProviderGC.OnUserConnectionClose(context)
+		myContext.RoomProviderGC.OnUserConnectionClose(peer)
 	}
 }
 
-func (room *Room) addRoomUser(newRoomUser *RoomUser) {
+func (room *Room) addPeer(peer *Peer) {
 	for i, eachRoomUser := range room.Users {
-		if eachRoomUser.User.ID == newRoomUser.User.ID {
+		if eachRoomUser.User.ID == peer.User.ID {
 			//refactor
 			len := len(room.Users) - 1
 			room.Users[i] = room.Users[len]
@@ -111,7 +111,7 @@ func (room *Room) addRoomUser(newRoomUser *RoomUser) {
 			break
 		}
 	}
-	room.Users = append(room.Users, newRoomUser)
+	room.Users = append(room.Users, peer)
 }
 
 func (room *Room) addChatMessage(chatMessage *ChatMessage) {
@@ -144,7 +144,7 @@ func (room *Room) getSurveyByID(id int) *Survey {
 	return nil
 }
 
-func (room *Room) RemoveRoomUser(roomUser *RoomUser) bool {
+func (room *Room) RemoveRoomUser(roomUser *Peer) bool {
 	room.MediaRoom.RemoveAudioTrackByUser(roomUser.User)
 	for i, eachRoomUser := range room.Users {
 		if eachRoomUser.User.ID == roomUser.User.ID {
@@ -158,7 +158,7 @@ func (room *Room) MustRemove() bool {
 	return len(room.Users) == 0
 }
 
-func removeRoomUserByIndex(s []*RoomUser, i int) []*RoomUser {
+func removeRoomUserByIndex(s []*Peer, i int) []*Peer {
 	s[i] = s[len(s)-1]
 	return s[:len(s)-1]
 }

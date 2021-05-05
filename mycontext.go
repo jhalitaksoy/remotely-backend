@@ -7,6 +7,7 @@ type MyContext struct {
 	RoomStore      RoomStore
 	RoomProvider   RoomProvider
 	RoomProviderGC RoomProviderGC
+	RTMT           RealtimeMessageTransport
 }
 
 func newMyContextForTest() *MyContext {
@@ -18,6 +19,7 @@ func newMyContextForTest() *MyContext {
 	roomStore := NewRoomStoreImpl()
 	roomProvider := NewRoomProviderImpl(roomStore)
 	roomProviderGC := NewRoomProviderGCImpl(roomProvider, userStore)
+	rtmt := NewRealTimeMessageTransportDataChannel()
 	return &MyContext{
 		UserStore:      userStore,
 		PasswordStore:  passwordStore,
@@ -25,6 +27,7 @@ func newMyContextForTest() *MyContext {
 		RoomStore:      roomStore,
 		RoomProvider:   roomProvider,
 		RoomProviderGC: roomProviderGC,
+		RTMT:           rtmt,
 	}
 }
 
@@ -39,6 +42,7 @@ func newMyContext() *MyContext {
 	roomStore := NewRoomStoreDatabaseImpl(db)
 	roomProvider := NewRoomProviderImpl(roomStore)
 	roomProviderGC := NewRoomProviderGCImpl(roomProvider, userStore)
+	rtmt := NewRealTimeMessageTransportDataChannel()
 	return &MyContext{
 		UserStore:      userStore,
 		PasswordStore:  passwordStore,
@@ -46,5 +50,6 @@ func newMyContext() *MyContext {
 		RoomStore:      roomStore,
 		RoomProvider:   roomProvider,
 		RoomProviderGC: roomProviderGC,
+		RTMT:           rtmt,
 	}
 }

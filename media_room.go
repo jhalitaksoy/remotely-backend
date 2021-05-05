@@ -79,22 +79,22 @@ func (mediaRoom *MediaRoom) RemoveAudioTrackByUser(user *User) {
 
 //JoinUser is
 func (mediaRoom *MediaRoom) JoinUser(
-	context *Context,
+	peer *Peer,
 	sd webrtc.SessionDescription) (*webrtc.SessionDescription, error) {
 
-	pc := context.RoomUser.PeerConnection
+	pc := peer.PeerConnection
 
-	userAudioTrack := mediaRoom.findSuitableAudioTrack(context.User)
+	userAudioTrack := mediaRoom.findSuitableAudioTrack(peer.User)
 	if userAudioTrack == nil {
 		print("Room is full!")
 		return nil, errors.New("Room is full")
 	}
 
-	mediaRoom.allowSendAudioTrackToAllPeers(context)
+	mediaRoom.allowSendAudioTrackToAllPeers(peer)
 
 	AllowReceiveAudioTrack(pc)
 
-	if context.IsPublisher {
+	if peer.IsPublisher {
 		log.Println("Publisher")
 		AllowReceiveVideoTrack(pc)
 
@@ -103,11 +103,11 @@ func (mediaRoom *MediaRoom) JoinUser(
 		AllowSendVideoTrack(pc, mediaRoom.VideoTrack)
 	}
 
-	mediaRoom.addOnTrack(context.RoomUser)
+	mediaRoom.addOnTrack(peer)
 
-	log.Printf("Added RoomUser id : %d. RoomUser Count : %d", context.User.ID, len(context.Room.Users))
+	log.Printf("Added RoomUser id : %d. RoomUser Count : %d", peer.User.ID, len(peer.Room.Users))
 
-	DataChannelHandler(context)
+	DataChannelHandler(myContext, peer)
 
 	// Set the remote SessionDescription
 	err := pc.SetRemoteDescription(sd)
@@ -130,15 +130,15 @@ func (mediaRoom *MediaRoom) JoinUser(
 	return &answer, nil
 }
 
-func (mediaRoom *MediaRoom) allowSendAudioTrackToAllPeers(context *Context) {
+func (mediaRoom *MediaRoom) allowSendAudioTrackToAllPeers(peer *Peer) {
 	for _, userAudioTrack := range mediaRoom.UserAudioTracks {
-		if !userAudioTrack.IsSameUser(context.User) {
-			AllowSendAudioTrack(context.RoomUser.PeerConnection, userAudioTrack.Track)
+		if !userAudioTrack.IsSameUser(peer.User) {
+			AllowSendAudioTrack(peer.PeerConnection, userAudioTrack.Track)
 		}
 	}
 }
 
-func (mediaRoom *MediaRoom) addOnTrack(roomUser *RoomUser) {
+func (mediaRoom *MediaRoom) addOnTrack(roomUser *Peer) {
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
 	roomUser.PeerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
@@ -148,7 +148,7 @@ func (mediaRoom *MediaRoom) addOnTrack(roomUser *RoomUser) {
 	})
 }
 
-func (mediaRoom *MediaRoom) onTrack(roomUser *RoomUser, remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+func (mediaRoom *MediaRoom) onTrack(roomUser *Peer, remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 	// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 	// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
 	sendPLIInterval(roomUser.PeerConnection, remoteTrack)

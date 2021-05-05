@@ -11,22 +11,25 @@ type User struct {
 	Anonymous bool
 }
 
-//RoomUser is
-type RoomUser struct {
+//Peer is
+type Peer struct {
 	User           *User
 	PeerConnection *webrtc.PeerConnection
+	Room           *Room
 	DataChannel    *webrtc.DataChannel
+	IsPublisher    bool
 }
 
-//NewRoomUser is
-func NewRoomUser(user *User, peerConnection *webrtc.PeerConnection) *RoomUser {
-	return &RoomUser{
+//NewPeer is
+func NewPeer(user *User, peerConnection *webrtc.PeerConnection, room *Room, isPublisher bool) *Peer {
+	return &Peer{
 		User:           user,
 		PeerConnection: peerConnection,
+		Room:           room,
+		IsPublisher:    isPublisher,
 	}
 }
 
-//SetDataChannel is
-func (roomUser *RoomUser) SetDataChannel(dataChannel *webrtc.DataChannel) {
-	roomUser.DataChannel = dataChannel
+func (peer *Peer) setDataChannel(dataChannel *webrtc.DataChannel) {
+	peer.DataChannel = dataChannel
 }

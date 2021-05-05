@@ -3,8 +3,8 @@ package main
 import "log"
 
 type RoomProviderGC interface {
-	OnUserConnectionOpen(*Context)
-	OnUserConnectionClose(*Context)
+	OnUserConnectionOpen(*Peer)
+	OnUserConnectionClose(*Peer)
 	SetRoomProvider(RoomProvider)
 	GetRoomProvider() RoomProvider
 	SetUserStore(UserStore)
@@ -57,16 +57,16 @@ func (roomProviderGC *RoomProviderGCImpl) GetUserStore() UserStore {
 	return roomProviderGC.userStore
 }
 
-func (roomProviderGC *RoomProviderGCImpl) OnUserConnectionOpen(context *Context) {
-	userConnectionCount := roomProviderGC.getUserConnectionCount(context.User)
+func (roomProviderGC *RoomProviderGCImpl) OnUserConnectionOpen(peer *Peer) {
+	userConnectionCount := roomProviderGC.getUserConnectionCount(peer.User)
 	userConnectionCount.OpenCount++
 }
 
-func (roomProviderGC *RoomProviderGCImpl) OnUserConnectionClose(context *Context) {
-	userConnectionCount := roomProviderGC.getUserConnectionCount(context.User)
+func (roomProviderGC *RoomProviderGCImpl) OnUserConnectionClose(peer *Peer) {
+	userConnectionCount := roomProviderGC.getUserConnectionCount(peer.User)
 	userConnectionCount.CloseCount++
-	roomProviderGC.onUserConnectionClose(context, userConnectionCount)
-	roomProviderGC.removeRoomIfRequired(context)
+	roomProviderGC.onUserConnectionClose(peer, userConnectionCount)
+	roomProviderGC.removeRoomIfRequired(peer)
 }
 
 func (roomProviderGC *RoomProviderGCImpl) getUserConnectionCount(user *User) *UserConnectionCout {
@@ -78,22 +78,22 @@ func (roomProviderGC *RoomProviderGCImpl) getUserConnectionCount(user *User) *Us
 	return userConnectionCount
 }
 
-func (roomProviderGC *RoomProviderGCImpl) onUserConnectionClose(context *Context, userConnectionCount *UserConnectionCout) {
-	if context.User.Anonymous {
-		roomProviderGC.userStore.Delete(context.User.ID)
-		context.Room.RemoveRoomUser(context.RoomUser)
-		log.Printf("Removed anonymous user from room : %v", context.RoomUser.User.ID)
+func (roomProviderGC *RoomProviderGCImpl) onUserConnectionClose(peer *Peer, userConnectionCount *UserConnectionCout) {
+	if peer.User.Anonymous {
+		roomProviderGC.userStore.Delete(peer.User.ID)
+		peer.Room.RemoveRoomUser(peer)
+		log.Printf("Removed anonymous user from room : %v", peer.User.ID)
 	} else {
 		if userConnectionCount.MustRemove() {
-			context.Room.RemoveRoomUser(context.RoomUser)
-			log.Printf("Removed user from room : %v", context.RoomUser.User.ID)
+			peer.Room.RemoveRoomUser(peer)
+			log.Printf("Removed user from room : %v", peer.User.ID)
 		}
 	}
 }
 
-func (roomProviderGC *RoomProviderGCImpl) removeRoomIfRequired(context *Context) {
-	if context.Room.MustRemove() {
-		roomProviderGC.roomProvider.RemoveFromCache(context.Room.ID)
-		log.Printf("Removed room from cache : %v", context.Room.ID)
+func (roomProviderGC *RoomProviderGCImpl) removeRoomIfRequired(peer *Peer) {
+	if peer.Room.MustRemove() {
+		roomProviderGC.roomProvider.RemoveFromCache(peer.Room.ID)
+		log.Printf("Removed room from cache : %v", peer.Room.ID)
 	}
 }
