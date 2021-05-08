@@ -114,6 +114,8 @@ func (mediaRoom *MediaRoom) JoinUser(
 		panic(err)
 	}
 
+	peer.Room.UpdateSDPs(myContext, peer)
+
 	return &answer, nil
 }
 
