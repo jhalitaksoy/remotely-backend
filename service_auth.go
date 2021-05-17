@@ -69,6 +69,10 @@ func (authService *AuthServiceImpl) Register(registerParameters *RegisterParamet
 func (authService *AuthServiceImpl) Login(loginParameters *LoginParameters) (int, string) {
 	user := authService.GetUserStore().GetByName(loginParameters.Name)
 
+	if user == nil {
+		return http.StatusConflict, ""
+	}
+
 	hash := authService.GetPasswordStore().Get(user.ID)
 	if hash == nil {
 		return http.StatusConflict, ""

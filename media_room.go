@@ -115,6 +115,7 @@ func (mediaRoom *MediaRoom) JoinUser(
 	}
 
 	peer.Room.UpdateSDPs(myContext, peer)
+	peer.Room.ListenIceMessages(peer, myContext)
 
 	return &answer, nil
 }
