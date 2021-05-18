@@ -8,6 +8,7 @@ import (
 )
 
 var ErrDataChannelNotFound = errors.New("DataChannel not found")
+var ErrPeerNotConnected = errors.New("Peer Not Connected")
 var ErrAlreadyListening = errors.New("already listening")
 
 type RealtimeMessageTransportDataChannel struct {
