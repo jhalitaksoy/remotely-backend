@@ -120,6 +120,45 @@ func (mediaRoom *MediaRoom) JoinUser(
 	return &answer, nil
 }
 
+func (mediaRoom *MediaRoom) JoinUserWithoutSDP(peer *Peer) error {
+
+	pc := peer.PeerConnection
+
+	userAudioTrack := mediaRoom.findSuitableAudioTrack(peer.User)
+	if userAudioTrack == nil {
+		print("Room is full!")
+		return errors.New("Room is full")
+	}
+
+	mediaRoom.allowSendAudioTrackToAllPeers(peer)
+	mediaRoom.allowSendAudioTrackToAllPeers2(peer, userAudioTrack)
+	AllowReceiveAudioTrack(pc)
+
+	if peer.IsPublisher {
+		log.Println("Publisher")
+		AllowReceiveVideoTrack(pc)
+
+	} else {
+		log.Println("Client")
+		AllowSendVideoTrack(pc, mediaRoom.VideoTrack)
+	}
+
+	mediaRoom.addOnTrack(peer)
+
+	log.Printf("Added RoomUser id : %d. RoomUser Count : %d", peer.User.ID, len(peer.Room.Users))
+
+	DataChannelHandler(myContext, peer)
+
+	/*pc.OnNegotiationNeeded(func() {
+		log.Println("OnNegotiationNeeded")
+	})*/
+
+	peer.Room.UpdateSDPs(myContext, peer)
+	peer.Room.ListenIceMessages(peer, myContext)
+
+	return nil
+}
+
 func (mediaRoom *MediaRoom) allowSendAudioTrackToAllPeers(peer *Peer) {
 	for userID, userAudioTrack := range mediaRoom.UserAudioTracks {
 		if peer.User.ID != userID {

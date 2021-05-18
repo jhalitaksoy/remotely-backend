@@ -84,6 +84,29 @@ func (room *Room) JoinUserToRoom(myContext *MyContext, user *User, sd webrtc.Ses
 	return mediaRoom.JoinUser(peer, sd)
 }
 
+func (room *Room) JoinUserWithoutSDP(myContext *MyContext, user *User, isPublisher bool) error {
+	mediaRoom := room.MediaRoom
+	if mediaRoom == nil {
+		return errors.New("media room not found")
+	}
+
+	pc := mediaRoom.NewPeerConnection()
+	peer := NewPeer(user, pc, room, isPublisher)
+	room.addPeer(peer)
+
+	myContext.RoomProviderGC.OnUserConnectionOpen(peer)
+
+	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		log.Println(pcs.String())
+		room.onPeerConnectionChange(peer, myContext, pcs)
+	})
+
+	myContext.RTMT.Listen(ChannelSDPOffer, room.OnSDPOfferMessage)
+	myContext.RTMT.Listen(ChannelSDPAnswer, room.OnSDPAnswerMessage)
+
+	return mediaRoom.JoinUserWithoutSDP(peer)
+}
+
 func (room *Room) onPeerConnectionChange(peer *Peer, myContext *MyContext, pcs webrtc.PeerConnectionState) {
 	switch pcs {
 	case webrtc.PeerConnectionStateNew:
@@ -112,6 +135,15 @@ func (room *Room) addPeer(peer *Peer) {
 		}
 	}
 	room.Users = append(room.Users, peer)
+}
+
+func (room *Room) getPeer(userID int) *Peer {
+	for _, eachRoomUser := range room.Users {
+		if eachRoomUser.User.ID == userID {
+			return eachRoomUser
+		}
+	}
+	return nil
 }
 
 func (room *Room) addChatMessage(chatMessage *ChatMessage) {
