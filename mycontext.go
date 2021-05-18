@@ -8,6 +8,7 @@ type MyContext struct {
 	RoomProvider   RoomProvider
 	RoomProviderGC RoomProviderGC
 	RTMT           RealtimeMessageTransport
+	Hub            *Hub
 }
 
 func newMyContextForTest() *MyContext {
@@ -19,7 +20,11 @@ func newMyContextForTest() *MyContext {
 	roomStore := NewRoomStoreImpl()
 	roomProvider := NewRoomProviderImpl(roomStore)
 	roomProviderGC := NewRoomProviderGCImpl(roomProvider, userStore)
-	rtmt := NewRealTimeMessageTransportDataChannel()
+	rtmt := NewRealtimeMessageTransportWebSocket()
+	rtmt.ListenTestChannel()
+	hub := NewHub()
+	go hub.Run()
+	go hub.HandleMessage()
 	return &MyContext{
 		UserStore:      userStore,
 		PasswordStore:  passwordStore,
@@ -28,6 +33,7 @@ func newMyContextForTest() *MyContext {
 		RoomProvider:   roomProvider,
 		RoomProviderGC: roomProviderGC,
 		RTMT:           rtmt,
+		Hub:            hub,
 	}
 }
 
@@ -42,7 +48,11 @@ func newMyContext() *MyContext {
 	roomStore := NewRoomStoreDatabaseImpl(db)
 	roomProvider := NewRoomProviderImpl(roomStore)
 	roomProviderGC := NewRoomProviderGCImpl(roomProvider, userStore)
-	rtmt := NewRealTimeMessageTransportDataChannel()
+	rtmt := NewRealtimeMessageTransportWebSocket()
+	rtmt.ListenTestChannel()
+	hub := NewHub()
+	go hub.Run()
+	go hub.HandleMessage()
 	return &MyContext{
 		UserStore:      userStore,
 		PasswordStore:  passwordStore,
@@ -51,5 +61,6 @@ func newMyContext() *MyContext {
 		RoomProvider:   roomProvider,
 		RoomProviderGC: roomProviderGC,
 		RTMT:           rtmt,
+		Hub:            hub,
 	}
 }
