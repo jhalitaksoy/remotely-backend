@@ -15,9 +15,10 @@ func DataChannelHandler(myContext *MyContext, peer *Peer) {
 
 		rtmtDataChannel, ok := myContext.RTMT.(*RealtimeMessageTransportDataChannel)
 		if !ok {
-			panic("rtmt is not RealtimeMessageTransportDataChannel")
-		}
+			log.Println("rtmt is not RealtimeMessageTransportDataChannel")
 
-		rtmtDataChannel.AddPeer(peer.User.ID, peer)
+		} else {
+			rtmtDataChannel.AddPeer(peer.User.ID, peer)
+		}
 	})
 }
