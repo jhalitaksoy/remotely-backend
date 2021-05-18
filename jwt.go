@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"log"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -22,4 +24,25 @@ func CreateJWTToken(user *User) (string, error) {
 		return "", err
 	}
 	return signedToken, nil
+}
+
+func ParseJWTKey(key string) (*jwtClaims, error) {
+	token, err := jwt.ParseWithClaims(
+		key,
+		&jwtClaims{},
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(secretKey), nil
+		},
+	)
+	if err != nil {
+		log.Println("Can not parse jwt token")
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*jwtClaims)
+	if !ok {
+		log.Println("couldn't parse claims")
+		return nil, errors.New("couldn't parse claims")
+	}
+	return claims, nil
 }

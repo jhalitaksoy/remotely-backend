@@ -26,26 +26,12 @@ func requiredAuthentication(context *gin.Context) {
 		context.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	jwtFromHeader := array[1]
-	token, err := jwt.ParseWithClaims(
-		jwtFromHeader,
-		&jwtClaims{},
-		func(token *jwt.Token) (interface{}, error) {
-			return []byte(secretKey), nil
-		},
-	)
+
+	claims, err := ParseJWTKey(array[1])
 	if err != nil {
-		log.Println("Can not parse jwt token")
-		context.AbortWithStatus(http.StatusUnauthorized)
+		context.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-
-	claims, ok := token.Claims.(*jwtClaims)
-	if !ok {
-		log.Println("couldn't parse claims")
-		return
-	}
-
 	context.Set(jwtClaimsKeyName, claims)
 
 	user := myContext.UserStore.GeById(claims.UserID)
