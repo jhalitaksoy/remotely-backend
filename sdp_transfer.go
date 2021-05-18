@@ -7,7 +7,8 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-const ChannelSDP = "sdp"
+const ChannelSDPAnswer = "sdp_answer"
+const ChannelSDPOffer = "sdp_offer"
 const ChannelICE = "ice"
 
 func (room *Room) UpdateSDPs(myContext *MyContext, _peer *Peer) {
@@ -18,10 +19,8 @@ func (room *Room) UpdateSDPs(myContext *MyContext, _peer *Peer) {
 		ICERestart: false,
 	}
 
-	myContext.RTMT.Listen(ChannelSDP, room.OnSDPMessage)
-
 	for _, peer := range room.Users {
-		if peer.User.ID == _peer.Room.ID {
+		if peer.User.ID == _peer.User.ID {
 			continue
 		}
 		sdp, err := peer.PeerConnection.CreateOffer(offerOptions)
@@ -34,17 +33,41 @@ func (room *Room) UpdateSDPs(myContext *MyContext, _peer *Peer) {
 		if err != nil {
 			panic(err)
 		}
-		myContext.RTMT.Send(peer.User.ID, ChannelSDP, json)
+		myContext.RTMT.Send(peer.User.ID, ChannelSDPOffer, json)
 	}
 }
 
-func (room *Room) OnSDPMessage(peer *Peer, channel MessageChannel, message Message) {
+func (room *Room) OnSDPAnswerMessage(peer *Peer, channel MessageChannel, message Message) {
+	log.Println("OnSDPAnswerMessage")
 	var sdp webrtc.SessionDescription
 	err := json.Unmarshal(message, &sdp)
 	if err != nil {
 		panic(err)
 	}
 	peer.PeerConnection.SetRemoteDescription(sdp)
+}
+
+func (room *Room) OnSDPOfferMessage(peer *Peer, channel MessageChannel, message Message) {
+	log.Println("OnSDPOfferMessage")
+	var sdp webrtc.SessionDescription
+	err := json.Unmarshal(message, &sdp)
+	if err != nil {
+		panic(err)
+	}
+	peer.PeerConnection.SetRemoteDescription(sdp)
+	answer, err := peer.PeerConnection.CreateAnswer(nil)
+	if err != nil {
+		panic(err)
+	}
+	peer.PeerConnection.SetLocalDescription(answer)
+	answerJson, err := json.Marshal(answer)
+	if err != nil {
+		panic(err)
+	}
+	err = myContext.RTMT.Send(peer.User.ID, ChannelSDPAnswer, Message(answerJson))
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func (room *Room) ListenIceMessages(peer *Peer, myContext *MyContext) {
