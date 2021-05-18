@@ -90,14 +90,15 @@ func startGin(port string) *gin.Engine {
 		room.POST("/get/:roomid", getRoomRoute)
 		//Add Test
 		room.POST("/chat/:roomid", chatRoomRoute)
+		room.GET("/ws/:roomid", wsRoomRoute)
 	}
 
 	r.Use(requiredAuthentication)
 	{
 		room := r.Group("/room")
 		{
+			room.POST("/join/:roomid", joinRoomRoute)
 			room.POST("/create", createRoomRoute)
-			//room.POST("/join/:roomid", joinRoomRoute)
 			room.POST("/listRooms", listRoomsRoute)
 		}
 

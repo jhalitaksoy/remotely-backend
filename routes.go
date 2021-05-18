@@ -67,34 +67,123 @@ func createRoomRoute(c *gin.Context) {
 	c.AbortWithStatus(http.StatusOK)
 }
 
-/*
 func joinRoomRoute(c *gin.Context) {
+	userID := -1
 
 	_jwtClaims, exists := c.Get(jwtClaimsKeyName)
-	if !exists {
-		log.Println("Jwt Claims not found")
-		return
+	if exists {
+		jwtClaims, ok := _jwtClaims.(*jwtClaims)
+		if ok {
+			userID = jwtClaims.UserID
+		}
 	}
 
-	jwtClaims, ok := _jwtClaims.(jwtClaims)
-	if !ok {
-		log.Println("Jwt Claims is not jwtClaims")
-		return
+	var user *User
+
+	if userID >= 0 {
+		user = myContext.UserStore.GeById(userID)
+		if user == nil {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+	} else {
+		userID, err := myContext.UserStore.Create(&User{
+			Name:      "anonymous_user_" + createUUID(),
+			Anonymous: true,
+		})
+		if err != nil {
+			log.Printf("Error when creating anonymous user : %v", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		user = myContext.UserStore.GeById(userID)
+
 	}
 
 	roomIDStr := c.Params.ByName("roomid")
 	roomID, err := strconv.Atoi(roomIDStr)
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
-	}
-	room, err := myContext.RoomStore.GetByID(roomID)
-	ok := roomRepository.JoinRoom(user, room)
-	if !ok {
-		c.AbortWithStatus(http.StatusConflict)
 		return
 	}
+
+	room, err := myContext.RoomProvider.GetFromCache(roomID)
+	if err == pg.ErrNoRows {
+		c.Status(http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	//todo : get from client
+	isPublisher := false
+
+	err = room.JoinUserWithoutSDP(myContext, user, isPublisher)
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+	}
+
 	c.AbortWithStatus(http.StatusOK)
-}*/
+}
+
+func wsRoomRoute(c *gin.Context) {
+
+	token := c.Query("token")
+	if token == "" {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	claims, err := ParseJWTKey(token)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	userID := claims.UserID
+
+	roomIDStr := c.Params.ByName("roomid")
+	roomID, err := strconv.Atoi(roomIDStr)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	room, err := myContext.RoomProvider.GetFromCache(roomID)
+	if err == pg.ErrNoRows {
+		c.Status(http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	peer := room.getPeer(userID)
+
+	upgrader.CheckOrigin = func(r *http.Request) bool {
+		// TODO : Security !!!
+		return true
+	}
+
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	client := &UserClientWS{hub: myContext.Hub, conn: conn, send: make(chan []byte, 256), Peer: peer}
+	client.hub.register <- client
+
+	// Allow collection of memory referenced by the caller by doing all work in
+	// new goroutines.
+	go client.writePump()
+	go client.readPump()
+}
 
 func listRoomsRoute(c *gin.Context) {
 
