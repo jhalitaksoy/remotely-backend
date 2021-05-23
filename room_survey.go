@@ -11,7 +11,7 @@ type SurveyCreateParams struct {
 	Options []*SurveyOption `json:"options"`
 }
 
-func OnSurveyCreate(room *Room, roomUser *Peer, data []byte) {
+func OnSurveyCreate(myContext *MyContext, peer *Peer, data []byte) {
 	var surveyCreateParams SurveyCreateParams
 	err := json.Unmarshal(data, &surveyCreateParams)
 	if err != nil {
@@ -23,29 +23,42 @@ func OnSurveyCreate(room *Room, roomUser *Peer, data []byte) {
 		Options: surveyCreateParams.Options,
 	}
 
-	survey := room.CreateNewSurvey(surveyFromUser)
-	room.addSurvey(survey)
+	survey := peer.Room.CreateNewSurvey(surveyFromUser)
+	peer.Room.addSurvey(survey)
 
-	sendNewSurveyToRoom(room, survey)
+	sendNewSurveyToRoom(myContext, peer.Room, survey)
 	log.Println("On New Survey")
 
 	go func() {
 		time.Sleep(surveyEndDuration)
 		log.Println("On Survey Destroy! Survey ID : ", survey.ID)
-
-		//surveyEndMessage := map[string]interface{}{ "surveyID": survey.ID}
-
-		room.removeSurvey(survey)
-
-		//sendMessageToRoom(room, surveyEnd, surveyEndMessage)
+		peer.Room.removeSurvey(survey)
+		sendSurveyDestroyToRoom(myContext, peer.Room, survey)
 	}()
 }
 
-func sendNewSurveyToRoom(room *Room, survey *Survey) {
-	//sendMessageToRoom(room, surveyCreate, survey)
+func sendNewSurveyToRoom(myContext *MyContext, room *Room, survey *Survey) {
+	surveyJson, err := json.Marshal(survey)
+	if err != nil {
+		log.Println(err)
+	}
+	for _, peer := range room.Users {
+		myContext.RTMT.Send(peer.User.ID, ChannelSurveyCreate, surveyJson)
+	}
 }
 
-func OnSurveyVote(room *Room, roomUser *Peer, data []byte) {
+func sendSurveyDestroyToRoom(myContext *MyContext, room *Room, survey *Survey) {
+	surveyEndMessage := map[string]interface{}{"surveyID": survey.ID}
+	messageJson, err := json.Marshal(surveyEndMessage)
+	if err != nil {
+		log.Println(err)
+	}
+	for _, peer := range room.Users {
+		myContext.RTMT.Send(peer.User.ID, ChannelSurveyDestroy, messageJson)
+	}
+}
+
+func OnSurveyVote(myContext *MyContext, peer *Peer, data []byte) {
 
 	var vote Vote
 	err := json.Unmarshal(data, &vote)
@@ -54,19 +67,25 @@ func OnSurveyVote(room *Room, roomUser *Peer, data []byte) {
 	}
 
 	log.Printf("On Vote Survey. Room : %d, User : %d, Survey : %d, Vote : %d",
-		room.ID, roomUser.User.ID, vote.SurveyID, vote.OptionID)
+		peer.Room.ID, peer.User.ID, vote.SurveyID, vote.OptionID)
 
-	survey := room.getSurveyByID(vote.SurveyID)
+	survey := peer.Room.getSurveyByID(vote.SurveyID)
 
 	if survey != nil {
-		survey.Vote(roomUser.User, vote.OptionID)
-		sendSurveyUpdatedToRoom(room, survey)
+		survey.Vote(peer.User, vote.OptionID)
+		sendSurveyUpdatedToRoom(peer.Room, survey)
 	} else {
 		log.Printf("Survey Not Found! Room : %d, User : %d, Survey : %d, Vote : %d",
-			room.ID, roomUser.User.ID, vote.SurveyID, vote.OptionID)
+			peer.Room.ID, peer.User.ID, vote.SurveyID, vote.OptionID)
 	}
 }
 
 func sendSurveyUpdatedToRoom(room *Room, survey *Survey) {
-	//sendMessageToRoom(room, surveyUpdate, survey)
+	surveyJson, err := json.Marshal(survey)
+	if err != nil {
+		log.Println(err)
+	}
+	for _, peer := range room.Users {
+		myContext.RTMT.Send(peer.User.ID, ChannelSurveyUpdate, surveyJson)
+	}
 }
