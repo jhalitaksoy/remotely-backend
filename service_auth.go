@@ -10,7 +10,7 @@ import (
 //AuthService ...
 type AuthService interface {
 	Register(registerParameters *RegisterParameters) int
-	Login(loginParameters *LoginParameters) (int, string)
+	Login(loginParameters *LoginParameters) (int, *LoginResult)
 	SetUserStore(userStore UserStore)
 	SetPasswordStore(passwordStore PasswordStore)
 	GetUserStore() UserStore
@@ -66,16 +66,16 @@ func (authService *AuthServiceImpl) Register(registerParameters *RegisterParamet
 	return http.StatusOK
 }
 
-func (authService *AuthServiceImpl) Login(loginParameters *LoginParameters) (int, string) {
+func (authService *AuthServiceImpl) Login(loginParameters *LoginParameters) (int, *LoginResult) {
 	user := authService.GetUserStore().GetByName(loginParameters.Name)
 
 	if user == nil {
-		return http.StatusConflict, ""
+		return http.StatusConflict, nil
 	}
 
 	hash := authService.GetPasswordStore().Get(user.ID)
 	if hash == nil {
-		return http.StatusConflict, ""
+		return http.StatusConflict, nil
 	}
 
 	hashBytes := []byte(*hash)
@@ -83,10 +83,11 @@ func (authService *AuthServiceImpl) Login(loginParameters *LoginParameters) (int
 
 	err := bcrypt.CompareHashAndPassword(hashBytes, plainText)
 	if err != nil {
-		return http.StatusConflict, ""
+		return http.StatusConflict, nil
 	} else {
 		jwt := authService.CreateJWTToken(user)
-		return http.StatusOK, jwt
+		loginResult := NewLoginResult(user.ID, user.Name, jwt)
+		return http.StatusOK, loginResult
 	}
 }
 

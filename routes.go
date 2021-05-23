@@ -30,8 +30,8 @@ func handleLogin(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	statusCode, userID := myContext.AuthService.Login(&loginParameters)
-	c.String(statusCode, userID)
+	statusCode, loginResult := myContext.AuthService.Login(&loginParameters)
+	c.JSON(statusCode, loginResult)
 }
 
 func createRoomRoute(c *gin.Context) {

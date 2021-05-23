@@ -9,3 +9,17 @@ type RegisterParameters struct {
 	Name     string `json:"name"`
 	Password string `json:"password"`
 }
+
+type LoginResult struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	JWTToken string `json:"jwt_token"`
+}
+
+func NewLoginResult(id int, name, jwtToken string) *LoginResult {
+	return &LoginResult{
+		ID:       id,
+		Name:     name,
+		JWTToken: jwtToken,
+	}
+}
