@@ -101,6 +101,7 @@ func (room *Room) JoinUserWithoutSDP(myContext *MyContext, user *User, isPublish
 		room.onPeerConnectionChange(peer, myContext, pcs)
 	})
 
+	ListenMessages(myContext, peer)
 	myContext.RTMT.Listen(ChannelSDPOffer, room.OnSDPOfferMessage)
 	myContext.RTMT.Listen(ChannelSDPAnswer, room.OnSDPAnswerMessage)
 
