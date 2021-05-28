@@ -18,4 +18,7 @@ func ListenMessages(myContext *MyContext, peer *Peer) {
 	myContext.RTMT.Listen(ChannelSurveyVote, func(peer *Peer, channel MessageChannel, message Message) {
 		OnSurveyVote(myContext, peer, message)
 	})
+	myContext.RTMT.Listen(ChannelReady, func(p *Peer, mc MessageChannel, m Message) {
+		sendOffer(peer, nil, myContext)
+	})
 }

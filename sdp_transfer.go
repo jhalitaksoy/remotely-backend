@@ -10,6 +10,7 @@ import (
 const ChannelSDPAnswer = "sdp_answer"
 const ChannelSDPOffer = "sdp_offer"
 const ChannelICE = "ice"
+const ChannelReady = "ready"
 
 func (room *Room) UpdateSDPs(myContext *MyContext, _peer *Peer) {
 	offerOptions := &webrtc.OfferOptions{
@@ -23,18 +24,22 @@ func (room *Room) UpdateSDPs(myContext *MyContext, _peer *Peer) {
 		if peer.User.ID == _peer.User.ID {
 			continue
 		}
-		sdp, err := peer.PeerConnection.CreateOffer(offerOptions)
-		if err != nil {
-			panic(err)
-		}
-		peer.PeerConnection.SetLocalDescription(sdp)
-
-		json, err := json.Marshal(sdp)
-		if err != nil {
-			panic(err)
-		}
-		myContext.RTMT.Send(peer.User.ID, ChannelSDPOffer, json)
+		sendOffer(peer, offerOptions, myContext)
 	}
+}
+
+func sendOffer(peer *Peer, offerOptions *webrtc.OfferOptions, myContext *MyContext) {
+	sdp, err := peer.PeerConnection.CreateOffer(offerOptions)
+	if err != nil {
+		panic(err)
+	}
+	peer.PeerConnection.SetLocalDescription(sdp)
+
+	json, err := json.Marshal(sdp)
+	if err != nil {
+		panic(err)
+	}
+	myContext.RTMT.Send(peer.User.ID, ChannelSDPOffer, json)
 }
 
 func (room *Room) OnSDPAnswerMessage(peer *Peer, channel MessageChannel, message Message) {
