@@ -1,4 +1,4 @@
-# remotely-frontend
+# remotely-backend
 
 Remotely Backend - WebRTC based online meeting.
 
