@@ -1,14 +1,42 @@
 package main
 
+import (
+	"errors"
+	"log"
+
+	"github.com/pion/webrtc/v3"
+)
+
 //Room is
 type Room struct {
 	ID           int
 	Name         string
-	Owner        *User
-	Users        []*RoomUser
+	OwnerID      int
+	Users        []*Peer
+	MediaRoom    *MediaRoom
 	ChatMessages []*ChatMessage
 	Surveys      []*Survey
 	lastSurveyID int
+}
+
+type RoomDB struct {
+	TableName struct{} `sql:"rooms"`
+	ID        int
+	Name      string
+	OwnerID   int
+}
+
+func NewRoom(roomdb RoomDB) *Room {
+	return &Room{
+		ID:           roomdb.ID,
+		Name:         roomdb.Name,
+		OwnerID:      roomdb.OwnerID,
+		Users:        make([]*Peer, 0),
+		MediaRoom:    NewMediaRoom(roomdb.ID),
+		ChatMessages: []*ChatMessage{},
+		Surveys:      make([]*Survey, 0),
+		lastSurveyID: -1,
+	}
 }
 
 //CreateNewSurvey create new Survey from given survey
@@ -34,17 +62,71 @@ func (room *Room) VoteSurvey(id int, user *User) {
 
 }
 
-//RoomRepository is
-type RoomRepository interface {
-	GetRoomByID(ID int) *Room
-	CreateRoom(*User, *Room) bool
-	JoinRoom(*User, *Room) bool
-	ListRooms(*User) []*Room
+func (room *Room) JoinUserToRoom(myContext *MyContext, user *User, sd webrtc.SessionDescription, isPublisher bool) (*webrtc.SessionDescription, error) {
+	mediaRoom := room.MediaRoom
+	if mediaRoom == nil {
+		return nil, errors.New("media room not found")
+	}
+
+	pc := mediaRoom.NewPeerConnection()
+	peer := NewPeer(user, pc, room, isPublisher)
+	room.addPeer(peer)
+
+	myContext.RoomProviderGC.OnUserConnectionOpen(peer)
+
+	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		log.Println(pcs.String())
+		room.onPeerConnectionChange(peer, myContext, pcs)
+	})
+
+	ListenMessages(myContext, peer)
+
+	return mediaRoom.JoinUser(peer, sd)
 }
 
-func (room *Room) addRoomUser(newRoomUser *RoomUser) {
+func (room *Room) JoinUserWithoutSDP(myContext *MyContext, user *User, isPublisher bool) error {
+	mediaRoom := room.MediaRoom
+	if mediaRoom == nil {
+		return errors.New("media room not found")
+	}
+
+	pc := mediaRoom.NewPeerConnection()
+	peer := NewPeer(user, pc, room, isPublisher)
+	room.addPeer(peer)
+
+	myContext.RoomProviderGC.OnUserConnectionOpen(peer)
+
+	pc.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		log.Println(pcs.String())
+		room.onPeerConnectionChange(peer, myContext, pcs)
+	})
+
+	ListenMessages(myContext, peer)
+	myContext.RTMT.Listen(ChannelSDPOffer, room.OnSDPOfferMessage)
+	myContext.RTMT.Listen(ChannelSDPAnswer, room.OnSDPAnswerMessage)
+
+	return mediaRoom.JoinUserWithoutSDP(peer)
+}
+
+func (room *Room) onPeerConnectionChange(peer *Peer, myContext *MyContext, pcs webrtc.PeerConnectionState) {
+	switch pcs {
+	case webrtc.PeerConnectionStateNew:
+	case webrtc.PeerConnectionStateConnecting:
+	case webrtc.PeerConnectionStateConnected:
+	case webrtc.PeerConnectionStateFailed:
+		//todo look later
+		//myContext.RoomProviderGC.OnUserConnectionClose(context)
+	case webrtc.PeerConnectionStateClosed:
+		//todo look later
+		//myContext.RoomProviderGC.OnUserConnectionClose(context)
+	case webrtc.PeerConnectionStateDisconnected:
+		myContext.RoomProviderGC.OnUserConnectionClose(peer)
+	}
+}
+
+func (room *Room) addPeer(peer *Peer) {
 	for i, eachRoomUser := range room.Users {
-		if eachRoomUser.User.ID == newRoomUser.User.ID {
+		if eachRoomUser.User.ID == peer.User.ID {
 			//refactor
 			len := len(room.Users) - 1
 			room.Users[i] = room.Users[len]
@@ -53,7 +135,16 @@ func (room *Room) addRoomUser(newRoomUser *RoomUser) {
 			break
 		}
 	}
-	room.Users = append(room.Users, newRoomUser)
+	room.Users = append(room.Users, peer)
+}
+
+func (room *Room) getPeer(userID int) *Peer {
+	for _, eachRoomUser := range room.Users {
+		if eachRoomUser.User.ID == userID {
+			return eachRoomUser
+		}
+	}
+	return nil
 }
 
 func (room *Room) addChatMessage(chatMessage *ChatMessage) {
@@ -86,7 +177,8 @@ func (room *Room) getSurveyByID(id int) *Survey {
 	return nil
 }
 
-func (room *Room) RemoveRoomUser(roomUser *RoomUser) bool {
+func (room *Room) RemoveRoomUser(roomUser *Peer) bool {
+	room.MediaRoom.RemoveAudioTrackByUser(roomUser.User)
 	for i, eachRoomUser := range room.Users {
 		if eachRoomUser.User.ID == roomUser.User.ID {
 			room.Users = removeRoomUserByIndex(room.Users, i)
@@ -95,59 +187,11 @@ func (room *Room) RemoveRoomUser(roomUser *RoomUser) bool {
 	}
 	return false
 }
+func (room *Room) MustRemove() bool {
+	return len(room.Users) == 0
+}
 
-func removeRoomUserByIndex(s []*RoomUser, i int) []*RoomUser {
+func removeRoomUserByIndex(s []*Peer, i int) []*Peer {
 	s[i] = s[len(s)-1]
 	return s[:len(s)-1]
-}
-
-var roomRepository RoomRepository = &RoomRepositoryMock{lastRoomID: -1, userRoomsTable: make(map[*User][]*Room)}
-
-// RoomRepositoryMock is
-type RoomRepositoryMock struct {
-	rooms          []*Room
-	userRoomsTable map[*User][]*Room
-	lastRoomID     int
-}
-
-//CreateRoom is
-func (repo *RoomRepositoryMock) CreateRoom(user *User, room *Room) bool {
-	repo.lastRoomID = repo.lastRoomID + 1
-	room.ID = repo.lastRoomID
-	room.Owner = user
-	room.lastSurveyID = 0
-	repo.JoinRoom(user, room)
-	repo.rooms = append(repo.rooms, room)
-	return true
-}
-
-//JoinRoom is
-func (repo *RoomRepositoryMock) JoinRoom(user *User, room *Room) bool {
-	list := repo.userRoomsTable[user]
-	for _, eachRoom := range list {
-		if eachRoom.ID == room.ID {
-			return false
-		}
-	}
-	repo.userRoomsTable[user] = append(list, room)
-	return true
-}
-
-//ListRooms is
-func (repo *RoomRepositoryMock) ListRooms(user *User) []*Room {
-	list := repo.userRoomsTable[user]
-	if list == nil {
-		return make([]*Room, 0)
-	}
-	return list
-}
-
-//GetRoomByID is
-func (repo *RoomRepositoryMock) GetRoomByID(ID int) *Room {
-	for _, room := range repo.rooms {
-		if room.ID == ID {
-			return room
-		}
-	}
-	return nil
 }
