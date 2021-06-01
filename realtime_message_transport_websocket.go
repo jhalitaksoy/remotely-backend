@@ -59,9 +59,6 @@ func (rtmt *RealtimeMessageTransportWebSocket) OnDisConnected(onConnectionChange
 
 func (rtmt *RealtimeMessageTransportWebSocket) OnWebsocketMessage(peer *Peer, msg []byte) {
 	channel, message, err := DecodeMessage(msg)
-	if channel != "ice" {
-		print(channel)
-	}
 	if err != nil {
 		log.Printf("An error occured when decoding message : %v", err)
 		return
