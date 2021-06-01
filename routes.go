@@ -118,10 +118,14 @@ func joinRoomRoute(c *gin.Context) {
 		return
 	}
 
-	//todo : get from client
-	isPublisher := false
+	var joinParameters JoinParameters
+	err = c.BindJSON(&joinParameters)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
 
-	err = room.JoinUserWithoutSDP(myContext, user, isPublisher)
+	err = room.JoinUserWithoutSDP(myContext, user, joinParameters.IsPublisher)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatus(http.StatusInternalServerError)

@@ -23,3 +23,7 @@ func NewLoginResult(id int, name, jwtToken string) *LoginResult {
 		JWTToken: jwtToken,
 	}
 }
+
+type JoinParameters struct {
+	IsPublisher bool `json:"isPublisher"`
+}
